@@ -85,8 +85,27 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+
+const updateAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const avatarPath = `/uploads/${req.file.filename}`;
+
+    await db.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatarPath, req.user.id]);
+
+    res.status(200).json({ avatar: avatarPath });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
   getAllUsers,
+  updateAvatar,
 };

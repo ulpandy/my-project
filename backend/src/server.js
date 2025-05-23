@@ -1,13 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const { logger } = require('./utils/logger');
 const { errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const activityRoutes = require('./routes/activityRoutes');
-
+const uploadsPath = path.join(__dirname, 'uploads');
 // Load environment variables
 dotenv.config();
 
@@ -57,4 +58,6 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 module.exports = app;

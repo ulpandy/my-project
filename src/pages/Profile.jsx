@@ -1,14 +1,19 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { FaUserCircle, FaEnvelope, FaUser, FaLock, FaSave } from 'react-icons/fa'
+
 
 function Profile() {
   const { currentUser, updateProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
+  const fileInputRef = useRef();
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     bio: currentUser?.bio || '',
+    avatar: currentUser?.avatar || '',
+    avatarFile: null, // ✅ нужно для отправки
+    avatarPreview: currentUser?.avatar || '', // ✅ нужно для отображения
     oldPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -23,42 +28,65 @@ function Profile() {
     })
   }
   
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    setMessage({ type: '', text: '' })
-    
-    // Password validation
-    if (formData.newPassword) {
-      if (formData.newPassword.length < 6) {
-        setMessage({ type: 'error', text: 'Password must be at least 6 characters' })
-        return
-      }
-      
-      if (formData.newPassword !== formData.confirmPassword) {
-        setMessage({ type: 'error', text: 'Passwords do not match' })
-        return
-      }
-      
-      if (!formData.oldPassword) {
-        setMessage({ type: 'error', text: 'Current password is required' })
-        return
-      }
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setMessage({ type: '', text: '' });
+
+  // Password validation
+  if (formData.newPassword) {
+    if (formData.newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+      return;
     }
-    
-    // Update profile
-    const result = updateProfile({
-      name: formData.name,
-      bio: formData.bio,
-      // In a real app, we would send the passwords to verify and update
-    })
-    
-    if (result.success) {
-      setMessage({ type: 'success', text: 'Profile updated successfully!' })
-      setIsEditing(false)
-    } else {
-      setMessage({ type: 'error', text: result.error || 'Failed to update profile' })
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      setMessage({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
+
+    if (!formData.oldPassword) {
+      setMessage({ type: 'error', text: 'Current password is required' });
+      return;
     }
   }
+
+  let avatarUrl = formData.avatar;
+
+  // ✅ Если есть выбранный файл — загружаем его на сервер
+  if (formData.avatarFile) {
+    const uploadData = new FormData();
+    uploadData.append('avatar', formData.avatarFile);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.patch('/users/avatar', uploadData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      avatarUrl = res.data.avatar;
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to upload avatar' });
+      return;
+    }
+  }
+
+  // ✅ Обновляем профиль
+  const result = updateProfile({
+    name: formData.name,
+    bio: formData.bio,
+    avatar: avatarUrl
+  });
+
+  if (result.success) {
+    setMessage({ type: 'success', text: 'Profile updated successfully!' });
+    setIsEditing(false);
+  } else {
+    setMessage({ type: 'error', text: result.error || 'Failed to update profile' });
+  }
+};
   
   return (
     <div className="max-w-3xl mx-auto">
@@ -66,8 +94,30 @@ function Profile() {
         {/* Profile header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-800 px-6 py-8 text-white">
           <div className="flex flex-col sm:flex-row items-center">
-            <div className="mb-4 sm:mb-0 sm:mr-6">
-              <FaUserCircle className="h-24 w-24 text-white opacity-80" />
+            <div className="mb-4 sm:mb-0 sm:mr-6 relative group cursor-pointer">
+              <img
+                src={formData.avatarPreview || currentUser?.avatar || '/default-avatar.png'}
+                alt="Avatar"
+                className="h-24 w-24 rounded-full border-4 border-white object-cover group-hover:opacity-80 transition-opacity"
+                onClick={() => fileInputRef.current.click()}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setFormData((prev) => ({
+                      ...prev,
+                      avatarFile: file,
+                      avatarPreview: URL.createObjectURL(file),
+                    }));
+                  }
+                }}
+              />
+              
             </div>
             <div className="text-center sm:text-left">
               <h1 className="text-2xl font-bold">{currentUser?.name}</h1>
@@ -142,6 +192,8 @@ function Profile() {
                   </div>
                 </div>
                 
+                
+                
                 <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
                   
@@ -186,7 +238,7 @@ function Profile() {
                         Leave blank to keep your current password.
                       </p>
                     </div>
-                    
+
                     <div>
                       <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                         Confirm New Password

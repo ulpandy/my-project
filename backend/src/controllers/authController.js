@@ -80,6 +80,7 @@ const login = async (req, res, next) => {
 
     // Generate JWT
     const token = generateToken(user);
+    console.log('JWT Token:', token)
 
     logger.info(`User logged in: ${user.id}`);
 

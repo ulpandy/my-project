@@ -60,11 +60,23 @@ const createTask = async (req, res, next) => {
     const { title, description, assignedTo, priority } = req.body;
     const createdBy = req.user.id;
 
+    console.log('CREATE TASK PAYLOAD:', { title, description, assignedTo, createdBy });
+
+    
     // Validate required fields
     if (!title) {
       throw new ApiError(400, 'Title is required');
     }
 
+if (assignedTo !== null && assignedTo !== undefined) {
+  if (typeof assignedTo !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(assignedTo)) {
+    throw new ApiError(400, 'assignedTo must be a valid UUID if provided');
+  }
+}
+    if (!createdBy || typeof createdBy !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(createdBy)) {
+      throw new ApiError(400, 'Valid createdBy UUID is required');
+    }
+    
     // Create the task
     const result = await db.query(
       `INSERT INTO tasks (title, description, assigned_to, priority, created_by)
@@ -83,6 +95,8 @@ const createTask = async (req, res, next) => {
     next(error);
   }
 };
+
+
 
 // Update a task
 const updateTask = async (req, res, next) => {
