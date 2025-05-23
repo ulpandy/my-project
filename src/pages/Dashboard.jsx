@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import TaskColumn from '../components/TaskColumn';
 
 function Dashboard() {
-  const { getTasksByStatus, createTask } = useTasks();
+  const { tasks, getTasksByStatus, createTask } = useTasks();
   const { currentUser } = useAuth();
 
   const [tasksByStatus, setTasksByStatus] = useState({
@@ -26,11 +26,9 @@ function Dashboard() {
   const [availableUsers, setAvailableUsers] = useState([]);
 
   useEffect(() => {
-    if (typeof getTasksByStatus === 'function') {
-      const result = getTasksByStatus();
-      if (result) setTasksByStatus(result);
-    }
-  }, [getTasksByStatus]);
+    const result = getTasksByStatus?.();
+    if (result) setTasksByStatus(result);
+  }, [tasks, getTasksByStatus]); // 🔄 обновление при изменении tasks
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -59,7 +57,7 @@ function Dashboard() {
     setIsCreatingTask(true);
   };
 
-  const handleSaveTask = () => {
+  const handleSaveTask = async () => {
     if (!newTask.title.trim()) return;
 
     const payload = {
@@ -67,18 +65,18 @@ function Dashboard() {
       assignedTo: newTask.assignedTo.trim() === '' ? null : newTask.assignedTo
     };
 
-    createTask(payload);
+    const result = await createTask(payload);
 
-    setNewTask({
-      title: '',
-      description: '',
-      assignedTo: '',
-      priority: 'medium'
-    });
-    setIsCreatingTask(false);
-    if (typeof getTasksByStatus === 'function') {
-      const result = getTasksByStatus();
-      if (result) setTasksByStatus(result);
+    if (result.success) {
+      setNewTask({
+        title: '',
+        description: '',
+        assignedTo: '',
+        priority: 'medium'
+      });
+      setIsCreatingTask(false);
+    } else {
+      alert(result.error || 'Failed to create task');
     }
   };
 

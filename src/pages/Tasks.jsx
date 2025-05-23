@@ -12,9 +12,15 @@ import { useTasks } from '../context/TasksContext';
 
 function Tasks() {
   const { currentUser } = useAuth();
-  const { getFilteredTasks, createTask, deleteTask } = useTasks();
+  const { tasks, getFilteredTasks, createTask, deleteTask } = useTasks();
+console.log("📦 Raw tasks:", tasks);
+  const filteredTasks = useMemo(() => {
+  const result = getFilteredTasks();
+  console.log("🎯 Filtered tasks:", result);
+  return result;
+}, [tasks, getFilteredTasks]);
 
-  const tasks = getFilteredTasks(); // всегда актуальные задачи
+console.log("👤 Current user:", currentUser?.id);
 
   const [sorting, setSorting] = useState([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -52,10 +58,7 @@ function Tasks() {
     {
       accessorKey: 'title',
       header: 'Title',
-      cell: info => {
-        const value = info.getValue();
-        return <div className="font-medium">{value || '—'}</div>;
-      }
+      cell: info => <div className="font-medium">{info.getValue() || '—'}</div>
     },
     {
       accessorKey: 'status',
@@ -95,10 +98,7 @@ function Tasks() {
     {
       accessorKey: 'assignedTo',
       header: 'Assigned To',
-      cell: info => {
-        const value = info.getValue();
-        return <div>{value || '—'}</div>;
-      }
+      cell: info => <div>{info.getValue() || '—'}</div>
     },
     {
       accessorKey: 'timeSpent',
@@ -139,7 +139,7 @@ function Tasks() {
   ], []);
 
   const table = useReactTable({
-    data: tasks || [],
+    data: filteredTasks || [],
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -171,7 +171,6 @@ function Tasks() {
       }
     }
   };
-
 
   return (
     <div className="space-y-6">

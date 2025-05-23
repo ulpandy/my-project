@@ -35,6 +35,7 @@ export function TasksProvider({ children }) {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
     if (!['admin', 'manager'].includes(currentUser.role)) {
       return { success: false, error: 'Permission denied' };
+      console.log("✅ Created task:", created);
     }
 
     try {
@@ -46,7 +47,7 @@ export function TasksProvider({ children }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const created = res.data.task;
+      const created = res.data;
       setTasks(prev => Array.isArray(prev) ? [...prev, created] : [created]);
       return { success: true, task: created };
     } catch (err) {
@@ -79,7 +80,9 @@ export function TasksProvider({ children }) {
 
       const updated = res.data.task;
       setTasks(prev => Array.isArray(prev)
-        ? prev.map(t => t.id === updated.id ? updated : t)
+        ? prev
+          .filter(t => t && typeof t === 'object' && 'id' in t)
+            .map(t => t.id === updated.id ? updated : t)
         : [updated]);
       return { success: true, task: updated };
     } catch (err) {
