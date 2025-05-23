@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import axios from 'axios';
+
 axios.defaults.baseURL = 'http://localhost:3000/api';
 
 const AuthContext = createContext();
-const USE_MOCK_AUTH = false; // ⬅️ переключай true/false для включения mock
+
 export function useAuth() {
   return useContext(AuthContext);
 }
@@ -38,66 +39,57 @@ export function AuthProvider({ children }) {
   }, [checkAuth]);
 
   // Login
- const login = async (email, password) => {
-  setLoading(true);
-  setError(null);
-
-  try {
-    const res = await axios.post('/auth/login', { email, password });
-
-    // Здесь берём все данные из ответа
-    const { token, id, email: userEmail, name, role } = res.data;
-
-    const user = { id, email: userEmail, name, role };
-
-    // Сохраняем пользователя и токен
-    setCurrentUser(user);
-    setToken(token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    Cookies.set('authToken', token, { expires: 7 });
-
-    return { success: true };
-  } catch (err) {
-    setError(err.response?.data?.message || 'Login failed');
-    return { success: false, error: err.response?.data?.message || 'Login failed' };
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-  // Register
-  const register = async (email, password, name) => {
+  const login = async (email, password) => {
     setLoading(true);
     setError(null);
 
     try {
-      if (email && password && name) {
-        const userData = {
-          id: Math.random().toString(36).substr(2, 9),
-          email,
-          name,
-          role: 'worker'
-        };
+      const res = await axios.post('/auth/login', { email, password });
+      const { token, id, email: userEmail, name, role } = res.data;
 
-        const mockToken = 'mock-jwt-token';
+      const user = { id, email: userEmail, name, role };
 
-        setCurrentUser(userData);
-        setToken(mockToken);
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', mockToken);
-        Cookies.set('authToken', mockToken, { expires: 7 });
+      setCurrentUser(user);
+      setToken(token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      Cookies.set('authToken', token, { expires: 7 });
 
-        return { success: true };
-      }
-
-      setError('Invalid registration data');
-      return { success: false, error: 'Invalid registration data' };
+      return { success: true };
     } catch (err) {
-      setError(err.message || 'An error occurred during registration');
-      return { success: false, error: err.message };
+      setError(err.response?.data?.message || 'Login failed');
+      return { success: false, error: err.response?.data?.message || 'Login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Register
+  const register = async (email, password, name, role = 'worker') => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await axios.post('/auth/register', {
+        email,
+        password,
+        name,
+        role
+      });
+
+      const { token, id, email: userEmail, name: userName, role: userRole } = res.data;
+      const user = { id, email: userEmail, name: userName, role: userRole };
+
+      setCurrentUser(user);
+      setToken(token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      Cookies.set('authToken', token, { expires: 7 });
+
+      return { success: true };
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed');
+      return { success: false, error: err.response?.data?.message || 'Registration failed' };
     } finally {
       setLoading(false);
     }

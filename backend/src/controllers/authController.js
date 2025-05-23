@@ -10,17 +10,18 @@ const sendEmail = require('../utils/sendEmail'); // создадим позже
 console.log('DEBUG typeof db:', typeof db);
 console.log('DEBUG typeof db.query:', typeof db.query);
 
-// Register a new user
 const register = async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
 
-    // Check if all required fields are provided
     if (!email || !password || !name) {
       throw new ApiError(400, 'Email, password, and name are required');
     }
 
-    // Check if user with this email already exists
+    // ⚠️ Допустимые роли
+    const allowedRoles = ['worker', 'manager'];
+    const userRole = allowedRoles.includes(role) ? role : 'worker';
+
     const existingUser = await db.query(
       'SELECT * FROM users WHERE email = $1',
       [email]
@@ -30,23 +31,18 @@ const register = async (req, res, next) => {
       throw new ApiError(409, 'User with this email already exists');
     }
 
-    // Hash the password
     const hashedPassword = await hashPassword(password);
 
-    // Insert the new user
     const result = await db.query(
       'INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-      [email, hashedPassword, name, 'worker']
+      [email, hashedPassword, name, userRole]
     );
 
     const newUser = result.rows[0];
-
-    // Generate JWT
     const token = generateToken(newUser);
 
     logger.info(`User registered: ${newUser.id}`);
 
-    // Return user info and token
     res.status(201).json({
       id: newUser.id,
       email: newUser.email,
