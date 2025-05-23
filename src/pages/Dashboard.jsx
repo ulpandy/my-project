@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { FaPlus, FaTasks } from 'react-icons/fa';
 import { useTasks } from '../context/TasksContext';
 import { useAuth } from '../context/AuthContext';
+import { useActivityTracker } from '../hooks/useActivityTracker'; // ← ДОБАВЛЕНО
 import TaskColumn from '../components/TaskColumn';
 
 function Dashboard() {
   const { tasks, getTasksByStatus, createTask } = useTasks();
   const { currentUser } = useAuth();
+  const { startTracking } = useActivityTracker(); // ← ДОБАВЛЕНО
 
   const [tasksByStatus, setTasksByStatus] = useState({
     todo: [],
@@ -25,10 +27,16 @@ function Dashboard() {
 
   const [availableUsers, setAvailableUsers] = useState([]);
 
+  // 🔥 НАЧАЛО ТРЕКИНГА АКТИВНОСТИ
+  useEffect(() => {
+    startTracking();
+    console.log('🔥 Activity tracking started');
+  }, []);
+
   useEffect(() => {
     const result = getTasksByStatus?.();
     if (result) setTasksByStatus(result);
-  }, [tasks, getTasksByStatus]); // 🔄 обновление при изменении tasks
+  }, [tasks, getTasksByStatus]);
 
   useEffect(() => {
     const fetchUsers = async () => {

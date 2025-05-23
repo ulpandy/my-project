@@ -1,19 +1,16 @@
 import { useState, useEffect } from 'react'
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement, 
-  Title, 
-  Tooltip, 
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
   Legend,
-  ArcElement,
-  PointElement,
-  LineElement,
-  Filler
+  ArcElement
 } from 'chart.js'
-import { Bar, Doughnut, Line } from 'react-chartjs-2'
-import { FaUsers, FaTasks, FaCheckCircle, FaClock } from 'react-icons/fa'
+import { Bar, Doughnut } from 'react-chartjs-2'
+import { FaUsers, FaTasks, FaCheckCircle, FaClock, FaFilePdf } from 'react-icons/fa'
 import { useTasks } from '../context/TasksContext'
 
 ChartJS.register(
@@ -23,10 +20,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement,
-  PointElement,
-  LineElement,
-  Filler
+  ArcElement
 )
 
 function TeamAnalytics() {
@@ -60,7 +54,41 @@ function TeamAnalytics() {
     })
   }, [tasks])
 
-  // Task distribution by member
+const handleDownloadPdf = async () => {
+  try {
+    const token = localStorage.getItem('token')
+
+    const today = new Date()
+    const startDate = today.toISOString().split('T')[0]
+
+    const end = new Date(today)
+    end.setDate(end.getDate() + 1)
+    const endDate = end.toISOString().split('T')[0]
+
+    const params = new URLSearchParams({ startDate, endDate })
+
+    const res = await fetch(`http://localhost:3000/api/activity/pdf?${params}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    if (!res.ok) throw new Error('Failed to generate PDF')
+
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'activity-report.pdf'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  } catch (err) {
+    alert('Error downloading PDF: ' + err.message)
+  }
+}
+
+
   const memberDistributionData = {
     labels: ['Admin', 'Manager', 'Worker'],
     datasets: [{
@@ -82,21 +110,20 @@ function TeamAnalytics() {
     }]
   }
 
-  // Task completion rate by member
   const completionRateData = {
     labels: ['Admin', 'Manager', 'Worker'],
     datasets: [{
       label: 'Completion Rate (%)',
       data: [
-        tasks.filter(t => t.assignedTo === '1').length ? 
-          (tasks.filter(t => t.assignedTo === '1' && t.status === 'done').length / 
-           tasks.filter(t => t.assignedTo === '1').length) * 100 : 0,
+        tasks.filter(t => t.assignedTo === '1').length ?
+          (tasks.filter(t => t.assignedTo === '1' && t.status === 'done').length /
+            tasks.filter(t => t.assignedTo === '1').length) * 100 : 0,
         tasks.filter(t => t.assignedTo === '2').length ?
           (tasks.filter(t => t.assignedTo === '2' && t.status === 'done').length /
-           tasks.filter(t => t.assignedTo === '2').length) * 100 : 0,
+            tasks.filter(t => t.assignedTo === '2').length) * 100 : 0,
         tasks.filter(t => t.assignedTo === '3').length ?
           (tasks.filter(t => t.assignedTo === '3' && t.status === 'done').length /
-           tasks.filter(t => t.assignedTo === '3').length) * 100 : 0
+            tasks.filter(t => t.assignedTo === '3').length) * 100 : 0
       ],
       backgroundColor: 'rgba(59, 130, 246, 0.5)',
       borderColor: 'rgb(59, 130, 246)'
@@ -107,115 +134,47 @@ function TeamAnalytics() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Team Analytics</h1>
-        
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          className="form-input py-1"
-        >
-          <option value="day">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
+        <div className="flex space-x-3">
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="form-input py-1"
+          >
+            <option value="day">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+          <button
+            onClick={handleDownloadPdf}
+            className="btn-outline flex items-center space-x-2"
+          >
+            <FaFilePdf />
+            <span>Download PDF</span>
+          </button>
+        </div>
       </div>
 
-      {/* Team Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card bg-white p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FaUsers className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Team Members</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {teamMetrics.activeMembers}/{teamMetrics.totalMembers}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-white p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <FaTasks className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-              <p className="text-2xl font-semibold text-gray-900">{teamMetrics.totalTasks}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-white p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FaCheckCircle className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Completed Tasks</p>
-              <p className="text-2xl font-semibold text-gray-900">{teamMetrics.completedTasks}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-white p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <FaClock className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Avg. Completion Time</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {Math.round(teamMetrics.averageCompletionTime / (1000 * 60 * 60))}h
-              </p>
-            </div>
-          </div>
-        </div>
+        <div className="card bg-white p-6"><FaUsers /> Members: {teamMetrics.activeMembers}/{teamMetrics.totalMembers}</div>
+        <div className="card bg-white p-6"><FaTasks /> Total Tasks: {teamMetrics.totalTasks}</div>
+        <div className="card bg-white p-6"><FaCheckCircle /> Completed: {teamMetrics.completedTasks}</div>
+        <div className="card bg-white p-6"><FaClock /> Avg. Time: {Math.round(teamMetrics.averageCompletionTime / (1000 * 60 * 60))}h</div>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Task Distribution by Member</h2>
-          <div className="aspect-square">
-            <Doughnut 
-              data={memberDistributionData}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: {
-                    position: 'top'
-                  }
-                }
-              }}
-            />
-          </div>
+          <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
+          <Doughnut data={memberDistributionData} />
         </div>
-
         <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Completion Rate by Member</h2>
-          <Bar 
-            data={completionRateData}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: false
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  max: 100,
-                  title: {
-                    display: true,
-                    text: 'Completion Rate (%)'
-                  }
-                }
-              }
-            }}
-          />
+          <h2 className="text-lg font-semibold mb-4">Completion Rate</h2>
+          <Bar data={completionRateData} options={{
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, max: 100, title: { display: true, text: 'Completion Rate (%)' } }
+            }
+          }} />
         </div>
       </div>
     </div>

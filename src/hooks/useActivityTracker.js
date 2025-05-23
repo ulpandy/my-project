@@ -1,109 +1,119 @@
-import { useState, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import axios from 'axios'
+
+const AI_SITES = ['chat.openai.com', 'bard.google.com', 'copilot.microsoft.com']
 
 export function useActivityTracker() {
   const [isTracking, setIsTracking] = useState(false)
-  const [activityData, setActivityData] = useState({
-    mouseClicks: 0,
-    keyPresses: 0,
-    mouseMovements: 0,
-    lastActive: null
-  })
-  
-  const timeoutRef = useRef(null)
-  const activityRef = useRef(activityData)
-  
-  // Update reference when state changes
-  activityRef.current = activityData
-  
-  // Track mouse clicks
-  const handleMouseClick = useCallback(() => {
-    setActivityData(prev => ({
-      ...prev,
-      mouseClicks: prev.mouseClicks + 1,
-      lastActive: new Date()
-    }))
-    
-    // In a real app, you might send this data to your backend
-    console.log('Mouse click detected')
-  }, [])
-  
-  // Track key presses
-  const handleKeyPress = useCallback(() => {
-    setActivityData(prev => ({
-      ...prev,
-      keyPresses: prev.keyPresses + 1,
-      lastActive: new Date()
-    }))
-    
-    // In a real app, you might send this data to your backend
-    console.log('Key press detected')
-  }, [])
-  
-  // Track mouse movements (throttled)
-  const handleMouseMove = useCallback(() => {
-    if (timeoutRef.current) return
-    
-    timeoutRef.current = setTimeout(() => {
-      setActivityData(prev => ({
-        ...prev,
-        mouseMovements: prev.mouseMovements + 1,
-        lastActive: new Date()
-      }))
-      
-      // In a real app, you might send this data to your backend periodically
-      timeoutRef.current = null
-    }, 500) // Throttle to avoid too many updates
-  }, [])
-  
-  // Start tracking user activity
-  const startTracking = useCallback(() => {
-    if (isTracking) return
-    
-    window.addEventListener('click', handleMouseClick)
-    window.addEventListener('keydown', handleKeyPress)
-    window.addEventListener('mousemove', handleMouseMove)
-    
-    setIsTracking(true)
-    console.log('Activity tracking started')
-    
-    return () => {
-      window.removeEventListener('click', handleMouseClick)
-      window.removeEventListener('keydown', handleKeyPress)
-      window.removeEventListener('mousemove', handleMouseMove)
+  const [lastActive, setLastActive] = useState(null)
+  const intervalRef = useRef(null)
+  const activityBuffer = useRef([])
+  const lastWindow = useRef('')
+
+  useEffect(() => {
+    const handleClick = () => bufferEvent('mouse_click')
+    const handleKeydown = () => bufferEvent('key_press')
+    const handleMouseMove = () => bufferEvent('mouse_move')
+
+    if (isTracking) {
+      window.addEventListener('click', handleClick)
+      window.addEventListener('keydown', handleKeydown)
+      window.addEventListener('mousemove', handleMouseMove)
+      intervalRef.current = setInterval(() => {
+        detectWindow()
+        sendBufferedEvents()
+      }, 10000)
     }
-  }, [isTracking, handleMouseClick, handleKeyPress, handleMouseMove])
-  
-  // Stop tracking user activity
-  const stopTracking = useCallback(() => {
-    if (!isTracking) return
-    
-    window.removeEventListener('click', handleMouseClick)
-    window.removeEventListener('keydown', handleKeyPress)
-    window.removeEventListener('mousemove', handleMouseMove)
-    
-    setIsTracking(false)
-    console.log('Activity tracking stopped')
-  }, [isTracking, handleMouseClick, handleKeyPress, handleMouseMove])
-  
-  // Periodically send activity data to the server
-  const sendActivityData = useCallback(() => {
-    // In a real application, you would send this data to your backend
-    console.log('Sending activity data to server:', activityRef.current)
-    
-    // Reset counters after sending
-    setActivityData(prev => ({
-      ...prev,
+
+    return () => {
+      window.removeEventListener('click', handleClick)
+      window.removeEventListener('keydown', handleKeydown)
+      window.removeEventListener('mousemove', handleMouseMove)
+      clearInterval(intervalRef.current)
+    }
+  }, [isTracking])
+
+  function bufferEvent(type, extraData = {}) {
+    activityBuffer.current.push({
+      type,
+      timestamp: new Date().toISOString(),
+      ...extraData
+    })
+    setLastActive(new Date())
+  }
+
+  function detectWindow() {
+    try {
+      const activeUrl = document.hasFocus() ? window.location.href : null
+      const domain = activeUrl ? new URL(activeUrl).hostname : 'none'
+      if (domain && domain !== lastWindow.current) {
+        lastWindow.current = domain
+        bufferEvent('window_switch', {
+          title: document.title,
+          url: activeUrl
+        })
+      }
+    } catch (e) {
+      console.warn('Window switch detection error:', e)
+    }
+  }
+
+  async function sendBufferedEvents() {
+    const token = localStorage.getItem('token')
+    if (!token || activityBuffer.current.length === 0) return
+
+    const grouped = {
       mouseClicks: 0,
       keyPresses: 0,
       mouseMovements: 0
-    }))
-  }, [])
-  
+    }
+
+    const events = activityBuffer.current
+    activityBuffer.current = []
+
+    for (const event of events) {
+      if (event.type === 'mouse_click') grouped.mouseClicks++
+      else if (event.type === 'key_press') grouped.keyPresses++
+      else if (event.type === 'mouse_move') grouped.mouseMovements++
+      else if (event.type === 'window_switch') {
+        const isAiTool = AI_SITES.includes(new URL(event.url).hostname)
+        try {
+          await axios.post('http://localhost:3000/api/activity', {
+            type: 'window-switch',
+            timestamp: event.timestamp,
+            title: event.title,
+            url: event.url,
+            isAiTool
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        } catch (err) {
+          console.error('Failed to log window switch:', err)
+        }
+      }
+    }
+
+    if (grouped.mouseClicks || grouped.keyPresses || grouped.mouseMovements) {
+      try {
+        await axios.post('http://localhost:3000/api/activity', {
+          type: 'user-activity',
+          timestamp: new Date().toISOString(),
+          mouseClicks: grouped.mouseClicks,
+          keyPresses: grouped.keyPresses,
+          mouseMovements: grouped.mouseMovements
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      } catch (err) {
+        console.error('Failed to log user activity:', err)
+      }
+    }
+  }
+
   return {
     isTracking,
-    activityData,
-    startTracking,
-    stopTracking,
-    sendActivityData
+    startTracking: () => setIsTracking(true),
+    stopTracking: () => setIsTracking(false),
+    lastActive
   }
 }

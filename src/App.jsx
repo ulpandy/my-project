@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
+import { useActivityTracker } from './hooks/useActivityTracker' // ✅ добавь
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 
@@ -30,12 +31,17 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   const { checkAuth } = useAuth()
-  
-  // Check if user is authenticated on app load
+  const { startTracking, stopTracking } = useActivityTracker() // ✅
+
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
-  
+
+  useEffect(() => {
+    startTracking() // ✅ стартуем трекинг при монтировании
+    return () => stopTracking() // ✅ выключаем при размонтировании
+  }, [startTracking, stopTracking])
+
   return (
     <DndProvider backend={HTML5Backend}>
       <Routes>
@@ -45,13 +51,13 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<FAQ />} />
         </Route>
-        
+
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Route>
-        
+
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
@@ -65,7 +71,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
           </Route>
         </Route>
-        
+
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
