@@ -4,45 +4,6 @@ import axios from 'axios';
 
 axios.defaults.baseURL = 'http://localhost:3000/api';
 
-const initialTasks = [
-  {
-    id: '1',
-    title: 'Create project plan',
-    description: 'Draft the initial project plan and timeline',
-    status: 'todo',
-    assignedTo: '2',
-    createdBy: '1',
-    priority: 'high'
-  },
-  {
-    id: '2',
-    title: 'Design UI mockups',
-    description: 'Create initial UI design for the dashboard',
-    status: 'inprogress',
-    assignedTo: '3',
-    createdBy: '2',
-    priority: 'medium'
-  },
-  {
-    id: '3',
-    title: 'Setup development environment',
-    description: 'Install necessary tools and configure the environment',
-    status: 'done',
-    assignedTo: '3',
-    createdBy: '2',
-    priority: 'low'
-  },
-  {
-    id: '4',
-    title: 'Review code standards',
-    description: 'Establish coding standards for the team',
-    status: 'frozen',
-    assignedTo: '2',
-    createdBy: '1',
-    priority: 'medium'
-  }
-];
-
 const TasksContext = createContext();
 
 export function useTasks() {
@@ -51,7 +12,7 @@ export function useTasks() {
 
 export function TasksProvider({ children }) {
   const { currentUser, token } = useAuth();
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState([]); // ✅ всегда инициализируем как массив
 
   const fetchTasks = useCallback(async () => {
     if (!token) return;
@@ -59,16 +20,10 @@ export function TasksProvider({ children }) {
       const res = await axios.get('/tasks', {
         headers: { Authorization: `Bearer ${token}` }
       });
-
-      const loadedTasks = res.data.tasks;
-      if (loadedTasks.length === 0) {
-        setTasks(initialTasks); // fallback к моковым задачам
-      } else {
-        setTasks(loadedTasks);
-      }
+      setTasks(Array.isArray(res.data.tasks) ? res.data.tasks : []); // ✅ защита от undefined
     } catch (err) {
       console.error('Error loading tasks:', err);
-      setTasks(initialTasks); // fallback при ошибке сервера
+      setTasks([]);
     }
   }, [token]);
 
@@ -90,17 +45,22 @@ export function TasksProvider({ children }) {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchTasks();
-      return { success: true, task: res.data.task };
+
+      const created = res.data.task;
+      setTasks(prev => Array.isArray(prev) ? [...prev, created] : [created]);
+      return { success: true, task: created };
     } catch (err) {
-      return { success: false, error: err.response?.data?.message || 'Create failed' };
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Create failed'
+      };
     }
   };
 
   const updateTask = async (id, updates) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
-    const task = tasks.find(t => t.id === parseInt(id) || t.id === id); // поддержка string/id
+    const task = tasks.find(t => t.id === id || t.id === parseInt(id));
     if (!task) return { success: false, error: 'Task not found' };
 
     if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
@@ -116,10 +76,17 @@ export function TasksProvider({ children }) {
       const res = await axios.put(`/tasks/${id}`, updates, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchTasks();
-      return { success: true, task: res.data.task };
+
+      const updated = res.data.task;
+      setTasks(prev => Array.isArray(prev)
+        ? prev.map(t => t.id === updated.id ? updated : t)
+        : [updated]);
+      return { success: true, task: updated };
     } catch (err) {
-      return { success: false, error: err.response?.data?.message || 'Update failed' };
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Update failed'
+      };
     }
   };
 
@@ -133,21 +100,36 @@ export function TasksProvider({ children }) {
       await axios.delete(`/tasks/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchTasks();
+
+      setTasks(prev => Array.isArray(prev) ? prev.filter(t => t.id !== id) : []);
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.response?.data?.message || 'Delete failed' };
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Delete failed'
+      };
     }
   };
 
-  const getFilteredTasks = useCallback(() => {
-    if (!currentUser) return [];
-    if (currentUser.role === 'admin') return tasks;
-    if (currentUser.role === 'manager') {
-      return tasks.filter(t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id);
-    }
-    return tasks.filter(t => t.assignedTo === currentUser.id);
-  }, [currentUser, tasks]);
+const getFilteredTasks = useCallback(() => {
+  if (!currentUser) return [];
+
+  // 💡 защита от null/undefined
+  const validTasks = Array.isArray(tasks)
+    ? tasks.filter(t => t && typeof t === 'object' && 'status' in t)
+    : [];
+
+  if (currentUser.role === 'admin') return validTasks;
+
+  if (currentUser.role === 'manager') {
+    return validTasks.filter(
+      t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
+    );
+  }
+
+  return validTasks.filter(t => t.assignedTo === currentUser.id);
+}, [currentUser, tasks]);
+
 
   const getTasksByStatus = useCallback(() => {
     const filtered = getFilteredTasks();
@@ -155,7 +137,7 @@ export function TasksProvider({ children }) {
       todo: filtered.filter(t => t.status === 'todo'),
       inprogress: filtered.filter(t => t.status === 'inprogress'),
       done: filtered.filter(t => t.status === 'done'),
-      frozen: filtered.filter(t => t.status === 'frozen'),
+      frozen: filtered.filter(t => t.status === 'frozen')
     };
   }, [getFilteredTasks]);
 
@@ -175,4 +157,5 @@ export function TasksProvider({ children }) {
     </TasksContext.Provider>
   );
 }
+
 export default TasksContext;

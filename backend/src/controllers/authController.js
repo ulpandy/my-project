@@ -75,7 +75,9 @@ const login = async (req, res, next) => {
 
     // Check if user exists and password is correct
     if (!user || !(await comparePassword(password, user.password_hash))) {
-      throw new ApiError(401, 'Invalid email or password');
+    
+      console.log("Login attempt:", req.body);
+
     }
 
     // Generate JWT

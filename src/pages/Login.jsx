@@ -40,9 +40,9 @@ function Login() {
   
   // Sample credentials info for demo purposes
   const sampleCredentials = [
-    { role: 'Admin', email: 'admin@example.com', password: 'password' },
-    { role: 'Manager', email: 'manager@example.com', password: 'password' },
-    { role: 'Worker', email: 'worker@example.com', password: 'password' }
+    { role: 'Admin', email: 'admintest@gmail.com', password: '3224212mM!' },
+    { role: 'Manager', email: 'testmanager@gmail.com', password: '3224212mM!' },
+    { role: 'Worker', email: 'zhasulan@z', password: '3224212mM!' }
   ]
   
   return (

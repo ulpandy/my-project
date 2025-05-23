@@ -72,7 +72,7 @@ const updateCurrentUser = async (req, res, next) => {
   }
 };
 
-// Get all users (admin only)
+// Get all users (admin,manager only)
 const getAllUsers = async (req, res, next) => {
   try {
     const result = await db.query(

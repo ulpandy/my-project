@@ -26,7 +26,10 @@ function Dashboard() {
   const [availableUsers, setAvailableUsers] = useState([]);
 
   useEffect(() => {
-    setTasksByStatus(getTasksByStatus());
+    if (typeof getTasksByStatus === 'function') {
+      const result = getTasksByStatus();
+      if (result) setTasksByStatus(result);
+    }
   }, [getTasksByStatus]);
 
   useEffect(() => {
@@ -52,7 +55,7 @@ function Dashboard() {
   }, [currentUser]);
 
   const handleCreateTask = () => {
-    if (!['admin', 'manager'].includes(currentUser.role)) return;
+    if (!['admin', 'manager'].includes(currentUser?.role)) return;
     setIsCreatingTask(true);
   };
 
@@ -73,7 +76,10 @@ function Dashboard() {
       priority: 'medium'
     });
     setIsCreatingTask(false);
-    setTasksByStatus(getTasksByStatus());
+    if (typeof getTasksByStatus === 'function') {
+      const result = getTasksByStatus();
+      if (result) setTasksByStatus(result);
+    }
   };
 
   const handleCancelTask = () => {
@@ -90,7 +96,7 @@ function Dashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        {['admin', 'manager'].includes(currentUser.role) && (
+        {['admin', 'manager'].includes(currentUser?.role) && (
           <button onClick={handleCreateTask} className="btn-primary flex items-center">
             <FaPlus className="mr-2" />
             New Task
@@ -180,11 +186,11 @@ function Dashboard() {
           <FaTasks className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h2 className="text-xl font-medium text-gray-900 mb-2">No tasks available</h2>
           <p className="text-gray-500 max-w-md mx-auto">
-            {['admin', 'manager'].includes(currentUser.role)
+            {['admin', 'manager'].includes(currentUser?.role)
               ? "You don't have any tasks yet. Create a new task to get started."
               : "You don't have any assigned tasks yet. Tasks assigned to you will appear here."}
           </p>
-          {['admin', 'manager'].includes(currentUser.role) && (
+          {['admin', 'manager'].includes(currentUser?.role) && (
             <button onClick={handleCreateTask} className="mt-4 btn-primary">
               Create Your First Task
             </button>

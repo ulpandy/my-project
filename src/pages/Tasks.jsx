@@ -1,143 +1,182 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   flexRender
-} from '@tanstack/react-table'
-import { FaSort, FaSortUp, FaSortDown, FaPlus, FaEdit, FaTrash } from 'react-icons/fa'
-import { useAuth } from '../context/AuthContext'
-import { useTasks } from '../context/TasksContext'
+} from '@tanstack/react-table';
+import { FaSort, FaSortUp, FaSortDown, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
+import { useTasks } from '../context/TasksContext';
 
 function Tasks() {
-  const { currentUser } = useAuth()
-  const { getFilteredTasks, createTask, updateTask, deleteTask } = useTasks()
-  const [sorting, setSorting] = useState([])
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
+  const { currentUser } = useAuth();
+  const { getFilteredTasks, createTask, deleteTask } = useTasks();
+
+  const tasks = getFilteredTasks(); // всегда актуальные задачи
+
+  const [sorting, setSorting] = useState([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     assignedTo: '',
     priority: 'medium'
-  })
+  });
 
-  const tasks = getFilteredTasks()
+  const [availableUsers, setAvailableUsers] = useState([]);
 
-  const columns = useMemo(
-    () => [
-      {
-        accessorKey: 'title',
-        header: 'Title',
-        cell: info => <div className="font-medium">{info.getValue()}</div>
-      },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: info => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-            info.getValue() === 'done' ? 'bg-green-100 text-green-800' :
-            info.getValue() === 'inprogress' ? 'bg-yellow-100 text-yellow-800' :
-            info.getValue() === 'frozen' ? 'bg-gray-100 text-gray-800' :
-            'bg-blue-100 text-blue-800'
-          }`}>
-            {info.getValue()}
-          </span>
-        )
-      },
-      {
-        accessorKey: 'priority',
-        header: 'Priority',
-        cell: info => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-            info.getValue() === 'high' ? 'bg-red-100 text-red-800' :
-            info.getValue() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-            'bg-green-100 text-green-800'
-          }`}>
-            {info.getValue()}
-          </span>
-        )
-      },
-      {
-        accessorKey: 'assignedTo',
-        header: 'Assigned To',
-        cell: info => <div>{info.getValue()}</div>
-      },
-      {
-        accessorKey: 'timeSpent',
-        header: 'Time Spent',
-        cell: info => {
-          const task = info.row.original
-          if (task.startTime && (task.endTime || task.status === 'inprogress')) {
-            const end = task.endTime ? new Date(task.endTime) : new Date()
-            const start = new Date(task.startTime)
-            const hours = Math.round((end - start) / (1000 * 60 * 60))
-            return `${hours}h`
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:3000/api/users', {
+          headers: {
+            Authorization: `Bearer ${token}`
           }
-          return '-'
-        }
-      },
-      {
-        id: 'actions',
-        header: 'Actions',
-        cell: info => (
-          <div className="flex space-x-2">
-            <button
-              onClick={() => handleEdit(info.row.original)}
-              className="text-blue-600 hover:text-blue-800"
-            >
-              <FaEdit />
-            </button>
-            <button
-              onClick={() => handleDelete(info.row.original.id)}
-              className="text-red-600 hover:text-red-800"
-            >
-              <FaTrash />
-            </button>
-          </div>
-        )
+        });
+        if (!res.ok) throw new Error('Failed to fetch users');
+        const data = await res.json();
+        setAvailableUsers(data);
+      } catch (error) {
+        console.error('Failed to load users:', error);
       }
-    ],
-    []
-  )
+    };
+
+    fetchUsers();
+  }, []);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'title',
+      header: 'Title',
+      cell: info => {
+        const value = info.getValue();
+        return <div className="font-medium">{value || '—'}</div>;
+      }
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: info => {
+        const status = info.getValue();
+        const className = {
+          done: 'bg-green-100 text-green-800',
+          inprogress: 'bg-yellow-100 text-yellow-800',
+          frozen: 'bg-gray-100 text-gray-800',
+          todo: 'bg-blue-100 text-blue-800'
+        }[status] || 'bg-gray-200 text-gray-800';
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${className}`}>
+            {status || '—'}
+          </span>
+        );
+      }
+    },
+    {
+      accessorKey: 'priority',
+      header: 'Priority',
+      cell: info => {
+        const priority = info.getValue();
+        const className = {
+          high: 'bg-red-100 text-red-800',
+          medium: 'bg-yellow-100 text-yellow-800',
+          low: 'bg-green-100 text-green-800'
+        }[priority] || 'bg-gray-200 text-gray-800';
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${className}`}>
+            {priority || '—'}
+          </span>
+        );
+      }
+    },
+    {
+      accessorKey: 'assignedTo',
+      header: 'Assigned To',
+      cell: info => {
+        const value = info.getValue();
+        return <div>{value || '—'}</div>;
+      }
+    },
+    {
+      accessorKey: 'timeSpent',
+      header: 'Time Spent',
+      cell: info => {
+        const task = info.row?.original;
+        if (!task || !task.startTime) return '—';
+        try {
+          const end = task.endTime ? new Date(task.endTime) : new Date();
+          const start = new Date(task.startTime);
+          const hours = Math.round((end - start) / (1000 * 60 * 60));
+          return `${hours}h`;
+        } catch {
+          return '—';
+        }
+      }
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: info => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => console.log('Edit not implemented')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            <FaEdit />
+          </button>
+          <button
+            onClick={() => handleDelete(info.row.original.id)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <FaTrash />
+          </button>
+        </div>
+      )
+    }
+  ], []);
 
   const table = useReactTable({
-    data: tasks,
+    data: tasks || [],
     columns,
-    state: {
-      sorting,
-      globalFilter
-    },
+    state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel()
-  })
+  });
 
-  const handleCreateTask = () => {
-    createTask(newTask)
-    setIsCreating(false)
+  const handleCreateTask = async () => {
+    const result = await createTask(newTask);
+    if (!result.success) {
+      alert(result.error || 'Failed to create task');
+    }
     setNewTask({
       title: '',
       description: '',
       assignedTo: '',
       priority: 'medium'
-    })
-  }
+    });
+    setIsCreating(false);
+  };
 
-  const handleDelete = (taskId) => {
+  const handleDelete = async (taskId) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
-      deleteTask(taskId)
+      const result = await deleteTask(taskId);
+      if (!result.success) {
+        alert(result.error || 'Failed to delete task');
+      }
     }
-  }
+  };
+
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
-        
         <div className="flex space-x-4">
           <input
             type="text"
@@ -146,11 +185,7 @@ function Tasks() {
             onChange={e => setGlobalFilter(e.target.value)}
             className="form-input"
           />
-          
-          <button
-            onClick={() => setIsCreating(true)}
-            className="btn-primary flex items-center"
-          >
+          <button onClick={() => setIsCreating(true)} className="btn-primary flex items-center">
             <FaPlus className="mr-2" />
             New Task
           </button>
@@ -170,7 +205,6 @@ function Tasks() {
                 onChange={e => setNewTask({ ...newTask, title: e.target.value })}
               />
             </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700">Description</label>
               <textarea
@@ -180,7 +214,6 @@ function Tasks() {
                 rows={3}
               />
             </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700">Assigned To</label>
               <select
@@ -189,12 +222,13 @@ function Tasks() {
                 onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
               >
                 <option value="">Select user</option>
-                <option value="1">Admin User</option>
-                <option value="2">Manager User</option>
-                <option value="3">Worker User</option>
+                {availableUsers.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.role})
+                  </option>
+                ))}
               </select>
             </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700">Priority</label>
               <select
@@ -207,18 +241,11 @@ function Tasks() {
                 <option value="high">High</option>
               </select>
             </div>
-            
             <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setIsCreating(false)}
-                className="btn-outline"
-              >
+              <button onClick={() => setIsCreating(false)} className="btn-outline">
                 Cancel
               </button>
-              <button
-                onClick={handleCreateTask}
-                className="btn-primary"
-              >
+              <button onClick={handleCreateTask} className="btn-primary">
                 Create Task
               </button>
             </div>
@@ -241,9 +268,7 @@ function Tasks() {
                       <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
                       {header.column.getCanSort() && (
                         <span>
-                          {{ asc: <FaSortUp />, desc: <FaSortDown /> }[
-                            header.column.getIsSorted()
-                          ] ?? <FaSort />}
+                          {{ asc: <FaSortUp />, desc: <FaSortDown /> }[header.column.getIsSorted()] ?? <FaSort />}
                         </span>
                       )}
                     </div>
@@ -266,7 +291,7 @@ function Tasks() {
         </table>
       </div>
     </div>
-  )
+  );
 }
 
-export default Tasks
+export default Tasks;

@@ -101,7 +101,12 @@ if (assignedTo !== null && assignedTo !== undefined) {
 // Update a task
 const updateTask = async (req, res, next) => {
   try {
+    
     const taskId = req.params.id;
+    const { validate: isUUID } = require('uuid');
+    if (!isUUID(taskId)) {
+      throw new ApiError(400, 'Invalid UUID format for task ID');
+    }
     const { title, description, status, assignedTo, priority } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;

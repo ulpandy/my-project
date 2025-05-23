@@ -5,6 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'remote';
 function authenticate(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
+  
     return res.status(401).json({ message: 'No authorization header' });
   }
 
