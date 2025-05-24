@@ -93,7 +93,7 @@ function Home() {
         <div className="container-custom">
           <h2 className="text-3xl font-bold mb-4">Ready to boost your productivity?</h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Join thousands of teams who use Bolt to streamline their workflow and get more done.
+            Join thousands of teams who use REMS to streamline their workflow and get more done.
           </p>
           <Link to="/register" className="btn bg-white text-accent-500 hover:bg-primary-50">
             Get Started for Free

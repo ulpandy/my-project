@@ -1,6 +1,6 @@
-# Bolt Backend API
+# Backend API
 
-This is the backend API for the Bolt task management application. It provides endpoints for user authentication, task management, and activity tracking.
+This is the backend API for the task management application. It provides endpoints for user authentication, task management, and activity tracking.
 
 ## Table of Contents
 
@@ -36,12 +36,12 @@ This is the backend API for the Bolt task management application. It provides en
 
 1. Create a PostgreSQL database:
    ```
-   createdb bolt
+   createdb 
    ```
 
 2. Run the database migration script:
    ```
-   psql -d bolt -f database.sql
+   psql -d  -f database.sql
    ```
 
 ### Environment Variables
@@ -56,7 +56,7 @@ NODE_ENV=development
 # Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=bolt
+DB_NAME=remote
 DB_USER=postgres
 DB_PASSWORD=your_password
 

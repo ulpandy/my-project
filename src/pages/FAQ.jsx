@@ -30,7 +30,7 @@ function FAQ() {
     },
     {
       question: 'Can I use REMS on mobile devices?',
-      answer: 'Yes, Bolt is fully responsive and works on all modern devices. We also have dedicated mobile apps for iOS and Android for a native mobile experience.'
+      answer: 'Yes, REMS is fully responsive and works on all modern devices. We also have dedicated mobile apps for iOS and Android for a native mobile experience.'
     },
     {
       question: 'What is the user activity tracking feature?',

@@ -1,5 +1,6 @@
 import { Outlet, Link } from 'react-router-dom'
-import { FaBolt } from 'react-icons/fa'
+import logo from "../assets/image/sea.png"
+
 
 function AuthLayout() {
   return (
@@ -7,8 +8,12 @@ function AuthLayout() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="flex items-center justify-center text-primary-600 hover:text-primary-700">
-            <FaBolt className="h-10 w-10" />
-            <span className="ml-2 text-2xl font-bold">Bolt</span>
+            <img
+                src={logo}
+                alt="Logo"
+                className="h-10 w-auto object-contain"
+              />
+            <span className="ml-2 text-2xl font-bold">REMS</span>
           </Link>
         </div>
         <div className="bg-white py-8 px-4 shadow-card sm:rounded-lg sm:px-10">
