@@ -20,7 +20,7 @@ export function TasksProvider({ children }) {
       const res = await axios.get('/tasks', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setTasks(Array.isArray(res.data.tasks) ? res.data.tasks : []); // ✅ защита от undefined
+      setTasks(Array.isArray(res.data) ? res.data : []); // ✅ защита от undefined
     } catch (err) {
       console.error('Error loading tasks:', err);
       setTasks([]);
@@ -59,39 +59,43 @@ export function TasksProvider({ children }) {
   };
 
   const updateTask = async (id, updates) => {
-    if (!currentUser) return { success: false, error: 'Not authenticated' };
+  if (!currentUser) return { success: false, error: 'Not authenticated' };
 
-    const task = tasks.find(t => t.id === id || t.id === parseInt(id));
-    if (!task) return { success: false, error: 'Task not found' };
+  const task = tasks.find(t => t?.id === id || t?.id === parseInt(id));
+  if (!task) return { success: false, error: 'Task not found' };
 
-    if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
-      return { success: false, error: 'Permission denied' };
-    }
+  if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
+    return { success: false, error: 'Permission denied' };
+  }
 
-    if ((updates.title || updates.description || updates.assignedTo) &&
-      !['admin', 'manager'].includes(currentUser.role)) {
-      return { success: false, error: 'Permission denied' };
-    }
+  if ((updates.title || updates.description || updates.assignedTo) &&
+    !['admin', 'manager'].includes(currentUser.role)) {
+    return { success: false, error: 'Permission denied' };
+  }
 
-    try {
-      const res = await axios.put(`/tasks/${id}`, updates, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  try {
+    const res = await axios.put(`/tasks/${id}`, updates, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-      const updated = res.data.task;
-      setTasks(prev => Array.isArray(prev)
-        ? prev
-          .filter(t => t && typeof t === 'object' && 'id' in t)
-            .map(t => t.id === updated.id ? updated : t)
-        : [updated]);
-      return { success: true, task: updated };
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Update failed'
-      };
-    }
-  };
+    const updated = res.data; // <= или res.data.task — смотри по своему backend
+    if (!updated || !updated.id) throw new Error('Invalid task format');
+
+    setTasks(prev => {
+      if (!Array.isArray(prev)) return [updated];
+      return prev
+        .filter(t => t && typeof t === 'object' && 'id' in t)
+        .map(t => (t.id === updated.id ? updated : t));
+    });
+
+    return { success: true, task: updated };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.message || 'Update failed'
+    };
+  }
+};
 
   const deleteTask = async (id) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
