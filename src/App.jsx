@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import { useActivityTracker } from './hooks/useActivityTracker' // ✅ добавь
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
+import { ProjectsProvider } from './context/ProjectsContext'
 
 // Layout
 import MainLayout from './layouts/MainLayout'
@@ -43,6 +44,7 @@ function App() {
   }, [startTracking, stopTracking])
 
   return (
+  <ProjectsProvider>
     <DndProvider backend={HTML5Backend}>
       <Routes>
         {/* Public Routes */}
@@ -72,11 +74,12 @@ function App() {
           </Route>
         </Route>
 
-        {/* Catch-all route */}
+        {/* Catch-all */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </DndProvider>
-  )
+  </ProjectsProvider>
+)
 }
 
 export default App

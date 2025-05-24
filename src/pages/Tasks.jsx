@@ -98,7 +98,14 @@ console.log("👤 Current user:", currentUser?.id);
     {
       accessorKey: 'assignedTo',
       header: 'Assigned To',
-      cell: info => <div>{info.getValue() || '—'}</div>
+      cell: info => {
+        const task = info.row.original;
+        return (
+          <div>
+            {task.assignedToName || '—'}
+          </div>
+        );
+      }
     },
     {
       accessorKey: 'timeSpent',
