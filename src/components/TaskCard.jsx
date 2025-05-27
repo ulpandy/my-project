@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDrag } from 'react-dnd'
-import { FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle, FaClock } from 'react-icons/fa'
+import { FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle, FaClock, FaPlay, FaStop } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { useTasks } from '../context/TasksContext'
 import { formatDistanceToNow, formatDuration, intervalToDuration } from 'date-fns'
@@ -48,6 +48,21 @@ function TaskCard({ task }) {
   const handleSave = () => {
     updateTask(task.id, { title, description })
     setIsEditing(false)
+  }
+
+  const handleStartTask = () => {
+    updateTask(task.id, {
+      startTime: new Date().toISOString(),
+      status: 'inprogress'
+    })
+  }
+
+  const handleStopTask = () => {
+    updateTask(task.id, {
+      endTime: new Date().toISOString(),
+      status: 'done',
+      timeSpent: elapsedTime
+    })
   }
   
   const formatTime = (ms) => {
@@ -137,6 +152,27 @@ function TaskCard({ task }) {
               <FaClock className="mr-1" />
               Time spent: {formatTime(elapsedTime)}
             </div>
+          )}
+
+          {/* Timer Controls */}
+          {task.status === 'todo' && (
+            <button
+              onClick={handleStartTask}
+              className="flex items-center text-sm text-primary-600 hover:text-primary-700 mb-3"
+            >
+              <FaPlay className="mr-1" />
+              Start Task
+            </button>
+          )}
+
+          {task.status === 'inprogress' && (
+            <button
+              onClick={handleStopTask}
+              className="flex items-center text-sm text-error-600 hover:text-error-700 mb-3"
+            >
+              <FaStop className="mr-1" />
+              Complete Task
+            </button>
           )}
           
           {/* Actions */}

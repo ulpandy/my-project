@@ -43,6 +43,13 @@ const register = async (req, res, next) => {
 
     logger.info(`User registered: ${newUser.id}`);
 
+ await sendEmail(
+  newUser.email,
+  'Welcome to the system!',
+  `<h2>Hello, ${newUser.name}!</h2><p>Thanks for registering in our system. Your role is: ${newUser.role}.</p>`
+);
+
+
     res.status(201).json({
       id: newUser.id,
       email: newUser.email,

@@ -17,6 +17,7 @@ import About from './pages/About'
 import FAQ from './pages/FAQ'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import Analytics from './pages/Analytics'
 import TeamAnalytics from './pages/TeamAnalytics'
@@ -58,6 +59,7 @@ function App() {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
         </Route>
 
         {/* Protected Routes */}

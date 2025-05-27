@@ -110,7 +110,7 @@ function FAQ() {
           </p>
           <div className="flex justify-center">
             <a 
-              href="mailto:support@rems.com" 
+              href="mailto: remshelper@gmail.com" 
               className="btn-primary"
             >
               Contact Support
