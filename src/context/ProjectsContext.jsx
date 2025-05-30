@@ -49,7 +49,7 @@ export function ProjectsProvider({ children }) {
     }
   }
 
-  // ✏️ Редактирование проекта
+  // Редактирование проекта
   const updateProject = async (id, updates) => {
     try {
       const res = await axios.put(`/projects/${id}`, updates, {

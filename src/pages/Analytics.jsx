@@ -50,26 +50,13 @@ function WorkerAnalytics() {
     end: addDays(startOfCurrentWeek, 6)
   })
 
-  // Helper function to safely parse dates
-  const parseDate = (dateString) => {
-    if (!dateString) return null
-    const date = new Date(dateString)
-    return isValid(date) ? date : null
-  }
-
   useEffect(() => {
     // Calculate worker-specific metrics
     const workerTasks = tasks.filter(task => task.assignedTo === currentUser.id)
     const completed = workerTasks.filter(task => task.status === 'done')
     
     const totalTime = completed.reduce((acc, task) => {
-      const startDate = parseDate(task.startTime)
-      const endDate = parseDate(task.endTime)
-      
-      if (startDate && endDate) {
-        return acc + (endDate - startDate)
-      }
-      return acc
+      return acc + (task.timeSpent || 0)
     }, 0)
 
     setMetrics({
@@ -87,11 +74,10 @@ function WorkerAnalytics() {
       label: 'Tasks Completed',
       data: weekDays.map(day => {
         return tasks.filter(task => {
-          if (task.assignedTo !== currentUser.id || task.status !== 'done') return false
-          
-          const endDate = parseDate(task.endTime)
-          if (!endDate) return false
-          
+          if (task.assignedTo !== currentUser.id || task.status !== 'done' || !task.endTime) {
+            return false
+          }
+          const endDate = new Date(task.endTime)
           return format(endDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
         }).length
       }),
@@ -134,22 +120,15 @@ function WorkerAnalytics() {
       label: 'Hours Worked',
       data: weekDays.map(day => {
         const dayTasks = tasks.filter(task => {
-          if (task.assignedTo !== currentUser.id || !task.startTime) return false
-          
-          const startDate = parseDate(task.startTime)
-          if (!startDate) return false
-          
-          return format(startDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+          if (task.assignedTo !== currentUser.id || !task.endTime) {
+            return false
+          }
+          const endDate = new Date(task.endTime)
+          return format(endDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
         })
         
         return dayTasks.reduce((acc, task) => {
-          const startDate = parseDate(task.startTime)
-          const endDate = task.endTime ? parseDate(task.endTime) : (task.status === 'inprogress' ? new Date() : null)
-          
-          if (startDate && endDate) {
-            return acc + (endDate - startDate) / (1000 * 60 * 60)
-          }
-          return acc
+          return acc + ((task.timeSpent || 0) / (1000 * 60 * 60)) // Convert ms to hours
         }, 0)
       }),
       fill: true,

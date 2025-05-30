@@ -76,7 +76,7 @@ function Footer() {
             <address className="not-italic text-gray-400">
               <p>Expo avenue</p>
               <p>Astana IT University</p>
-              <p className="mt-2">support@rems.com</p>
+              <p className="mt-2">remshelper@gmail.com</p>
             </address>
           </div>
         </div>
