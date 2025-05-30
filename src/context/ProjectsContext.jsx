@@ -2,94 +2,119 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import axios from 'axios'
 import { useAuth } from './AuthContext'
 
-axios.defaults.baseURL = 'http://localhost:3000/api'
+// Configure axios once (consider moving this to a separate api/client.js file)
+const apiClient = axios.create({
+  baseURL: 'http://localhost:3000/api',
+})
 
-const ProjectsContext = createContext()
+export const ProjectsContext = createContext()
 
 export function useProjects() {
-  return useContext(ProjectsContext)
+  const context = useContext(ProjectsContext)
+  if (!context) {
+    throw new Error('useProjects must be used within a ProjectsProvider')
+  }
+  return context
 }
 
 export function ProjectsProvider({ children }) {
   const { token } = useAuth()
   const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  // 🔄 Загрузка проектов
-  const fetchProjects = useCallback(async () => {
-    if (!token) return
-    try {
-      const res = await axios.get('/projects', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setProjects(Array.isArray(res.data) ? res.data : [])
-    } catch (err) {
-      console.error('❌ Failed to fetch projects:', err)
-      setProjects([])
+  // Add auth token to all requests
+  useEffect(() => {
+    const requestInterceptor = apiClient.interceptors.request.use(config => {
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    })
+
+    return () => {
+      apiClient.interceptors.request.eject(requestInterceptor)
     }
   }, [token])
 
+  // Fetch projects with proper loading/error states
+  const fetchProjects = useCallback(async () => {
+    if (!token) return
+    
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await apiClient.get('/projects')
+      setProjects(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch projects')
+      console.error('Project fetch error:', err)
+      setProjects([])
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  // Initial fetch
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
 
-  // ➕ Создание проекта
+  // Create project with optimistic updates
   const createProject = async (projectData) => {
     try {
-      const res = await axios.post('/projects', projectData, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      setError(null)
+      const res = await apiClient.post('/projects', projectData)
       const created = res.data
       setProjects(prev => [...prev, created])
       return { success: true, project: created }
     } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Create failed'
-      }
+      setError(err.response?.data?.message || 'Create project failed')
+      return { success: false, error: err.response?.data }
     }
   }
 
-  // Редактирование проекта
+  // Update project with optimistic updates
   const updateProject = async (id, updates) => {
     try {
-      const res = await axios.put(`/projects/${id}`, updates, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      setError(null)
+      const res = await apiClient.put(`/projects/${id}`, updates)
       const updated = res.data
       setProjects(prev =>
-        prev.map(project => (project.id === updated.id ? updated : project))
+        prev.map(project => (project._id === updated._id ? updated : project))
       )
-      return { success: true }
+      return { success: true, project: updated }
     } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Update failed'
-      }
+      setError(err.response?.data?.message || 'Update project failed')
+      return { success: false, error: err.response?.data }
     }
   }
 
-  // 🗑️ Удаление проекта
+  // Delete project with optimistic updates
   const deleteProject = async (id) => {
     try {
-      await axios.delete(`/projects/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setProjects(prev => prev.filter(project => project.id !== id))
+      setError(null)
+      await apiClient.delete(`/projects/${id}`)
+      setProjects(prev => prev.filter(project => project._id !== id))
       return { success: true }
     } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Delete failed'
-      }
+      setError(err.response?.data?.message || 'Delete project failed')
+      return { success: false, error: err.response?.data }
     }
   }
 
   const value = {
     projects,
+    loading,
+    error,
     fetchProjects,
     createProject,
     updateProject,
-    deleteProject
+    deleteProject,
+    // Consider adding:
+    // - selectedProject state
+    // - project filtering/sorting methods
+    // - refresh function
   }
 
   return (

@@ -12,7 +12,7 @@ export function useTasks() {
 
 export function TasksProvider({ children }) {
   const { currentUser, token } = useAuth();
-  const [tasks, setTasks] = useState([]); // ✅ всегда инициализируем как массив
+  const [tasks, setTasks] = useState([]);
 
   const fetchTasks = useCallback(async () => {
     if (!token) return;
@@ -20,7 +20,7 @@ export function TasksProvider({ children }) {
       const res = await axios.get('/tasks', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setTasks(Array.isArray(res.data) ? res.data : []); // ✅ защита от undefined
+      setTasks(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error loading tasks:', err);
       setTasks([]);
@@ -33,9 +33,9 @@ export function TasksProvider({ children }) {
 
   const createTask = async (taskData) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
+
     if (!['admin', 'manager'].includes(currentUser.role)) {
       return { success: false, error: 'Permission denied' };
-      console.log("✅ Created task:", created);
     }
 
     try {
@@ -48,9 +48,10 @@ export function TasksProvider({ children }) {
       });
 
       const created = res.data;
-      setTasks(prev => Array.isArray(prev) ? [...prev, created] : [created]);
+      setTasks(prev => [...prev, created]);
       return { success: true, task: created };
     } catch (err) {
+      console.error('Task creation failed:', err);
       return {
         success: false,
         error: err.response?.data?.message || 'Create failed'
@@ -59,46 +60,42 @@ export function TasksProvider({ children }) {
   };
 
   const updateTask = async (id, updates) => {
-  if (!currentUser) return { success: false, error: 'Not authenticated' };
+    if (!currentUser) return { success: false, error: 'Not authenticated' };
 
-  const task = tasks.find(t => t?.id === id || t?.id === parseInt(id));
-  if (!task) return { success: false, error: 'Task not found' };
+    const task = tasks.find(t => t?.id === id || t?.id === parseInt(id));
+    if (!task) return { success: false, error: 'Task not found' };
 
-  if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
-    return { success: false, error: 'Permission denied' };
-  }
+    if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
+      return { success: false, error: 'Permission denied' };
+    }
 
-  if ((updates.title || updates.description || updates.assignedTo) &&
-    !['admin', 'manager'].includes(currentUser.role)) {
-    return { success: false, error: 'Permission denied' };
-  }
+    if ((updates.title || updates.description || updates.assignedTo) &&
+      !['admin', 'manager'].includes(currentUser.role)) {
+      return { success: false, error: 'Permission denied' };
+    }
 
-  try {
-    const res = await axios.put(`/tasks/${id}`, updates, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    try {
+      const res = await axios.put(`/tasks/${id}`, updates, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const updated = res.data; // <= или res.data.task — смотри по своему backend
-    if (!updated || !updated.id) throw new Error('Invalid task format');
+      const updated = res.data;
+      if (!updated?.id) throw new Error('Invalid task format');
 
-    setTasks(prev => {
-      if (!Array.isArray(prev)) return [updated];
-      return prev
-        .filter(t => t && typeof t === 'object' && 'id' in t)
-        .map(t => (t.id === updated.id ? updated : t));
-    });
-
-    return { success: true, task: updated };
-  } catch (err) {
-    return {
-      success: false,
-      error: err.response?.data?.message || 'Update failed'
-    };
-  }
-};
+      setTasks(prev => prev.map(t => (t.id === updated.id ? updated : t)));
+      return { success: true, task: updated };
+    } catch (err) {
+      console.error('Task update failed:', err);
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Update failed'
+      };
+    }
+  };
 
   const deleteTask = async (id) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
+
     if (!['admin', 'manager'].includes(currentUser.role)) {
       return { success: false, error: 'Permission denied' };
     }
@@ -108,9 +105,10 @@ export function TasksProvider({ children }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setTasks(prev => Array.isArray(prev) ? prev.filter(t => t.id !== id) : []);
+      setTasks(prev => prev.filter(t => t.id !== id));
       return { success: true };
     } catch (err) {
+      console.error('Task deletion failed:', err);
       return {
         success: false,
         error: err.response?.data?.message || 'Delete failed'
@@ -118,25 +116,21 @@ export function TasksProvider({ children }) {
     }
   };
 
-const getFilteredTasks = useCallback(() => {
-  if (!currentUser) return [];
+  const getFilteredTasks = useCallback(() => {
+    if (!currentUser) return [];
 
-  // 💡 защита от null/undefined
-  const validTasks = Array.isArray(tasks)
-    ? tasks.filter(t => t && typeof t === 'object' && 'status' in t)
-    : [];
+    const validTasks = tasks.filter(t => t && typeof t === 'object' && 'status' in t);
 
-  if (currentUser.role === 'admin') return validTasks;
+    if (currentUser.role === 'admin') return validTasks;
 
-  if (currentUser.role === 'manager') {
-    return validTasks.filter(
-      t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
-    );
-  }
+    if (currentUser.role === 'manager') {
+      return validTasks.filter(
+        t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
+      );
+    }
 
-  return validTasks.filter(t => t.assignedTo === currentUser.id);
-}, [currentUser, tasks]);
-
+    return validTasks.filter(t => t.assignedTo === currentUser.id);
+  }, [currentUser, tasks]);
 
   const getTasksByStatus = useCallback(() => {
     const filtered = getFilteredTasks();
@@ -150,12 +144,12 @@ const getFilteredTasks = useCallback(() => {
 
   const value = {
     tasks,
-    getFilteredTasks,
-    getTasksByStatus,
+    fetchTasks,
     createTask,
     updateTask,
     deleteTask,
-    fetchTasks
+    getFilteredTasks,
+    getTasksByStatus
   };
 
   return (

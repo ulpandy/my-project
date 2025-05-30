@@ -1,25 +1,37 @@
 import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { FaUserCircle, FaEnvelope, FaUser, FaLock, FaSave } from 'react-icons/fa'
-
+import { FaUserCircle, FaEnvelope, FaUser, FaLock, FaSave, FaEye, FaEyeSlash } from 'react-icons/fa'
+import axios from 'axios'
 
 function Profile() {
   const { currentUser, updateProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
-  const fileInputRef = useRef();
+  const fileInputRef = useRef()
+  const [showPasswords, setShowPasswords] = useState({
+    oldPassword: false,
+    newPassword: false,
+    confirmPassword: false
+  })
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     bio: currentUser?.bio || '',
     avatar: currentUser?.avatar || '',
-    avatarFile: null, // ✅ нужно для отправки
-    avatarPreview: currentUser?.avatar || '', // ✅ нужно для отображения
+    avatarFile: null,
+    avatarPreview: currentUser?.avatar || '',
     oldPassword: '',
     newPassword: '',
     confirmPassword: ''
   })
   const [message, setMessage] = useState({ type: '', text: '' })
   
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }))
+  }
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData({
@@ -29,64 +41,73 @@ function Profile() {
   }
   
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setMessage({ type: '', text: '' });
+    e.preventDefault()
+    setMessage({ type: '', text: '' })
 
-  // Password validation
-  if (formData.newPassword) {
-    if (formData.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters' });
-      return;
+    // Password validation
+    if (formData.newPassword) {
+      if (formData.newPassword.length < 6) {
+        setMessage({ type: 'error', text: 'Password must be at least 6 characters' })
+        return
+      }
+
+      if (formData.newPassword !== formData.confirmPassword) {
+        setMessage({ type: 'error', text: 'Passwords do not match' })
+        return
+      }
+
+      if (!formData.oldPassword) {
+        setMessage({ type: 'error', text: 'Current password is required' })
+        return
+      }
     }
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      setMessage({ type: 'error', text: 'Passwords do not match' });
-      return;
+    let avatarUrl = formData.avatar
+
+    // Upload new avatar if selected
+    if (formData.avatarFile) {
+      const uploadData = new FormData()
+      uploadData.append('avatar', formData.avatarFile)
+
+      try {
+        const token = localStorage.getItem('token')
+        const res = await axios.patch('/users/avatar', uploadData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        avatarUrl = res.data.avatar
+      } catch (err) {
+        setMessage({ type: 'error', text: 'Failed to upload avatar' })
+        return
+      }
     }
 
-    if (!formData.oldPassword) {
-      setMessage({ type: 'error', text: 'Current password is required' });
-      return;
+    // Update profile
+    const result = await updateProfile({
+      name: formData.name,
+      bio: formData.bio,
+      avatar: avatarUrl,
+      oldPassword: formData.oldPassword,
+      newPassword: formData.newPassword
+    })
+
+    if (result.success) {
+      setMessage({ type: 'success', text: 'Profile updated successfully!' })
+      setIsEditing(false)
+      // Clear password fields
+      setFormData(prev => ({
+        ...prev,
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }))
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to update profile' })
     }
   }
-
-  let avatarUrl = formData.avatar;
-
-  // ✅ Если есть выбранный файл — загружаем его на сервер
-  if (formData.avatarFile) {
-    const uploadData = new FormData();
-    uploadData.append('avatar', formData.avatarFile);
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.patch('/users/avatar', uploadData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      avatarUrl = res.data.avatar;
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to upload avatar' });
-      return;
-    }
-  }
-
-  // ✅ Обновляем профиль
-  const result = updateProfile({
-    name: formData.name,
-    bio: formData.bio,
-    avatar: avatarUrl
-  });
-
-  if (result.success) {
-    setMessage({ type: 'success', text: 'Profile updated successfully!' });
-    setIsEditing(false);
-  } else {
-    setMessage({ type: 'error', text: result.error || 'Failed to update profile' });
-  }
-};
   
   return (
     <div className="max-w-3xl mx-auto">
@@ -107,22 +128,21 @@ function Profile() {
                 ref={fileInputRef}
                 className="hidden"
                 onChange={(e) => {
-                  const file = e.target.files[0];
+                  const file = e.target.files[0]
                   if (file) {
-                    setFormData((prev) => ({
+                    setFormData(prev => ({
                       ...prev,
                       avatarFile: file,
                       avatarPreview: URL.createObjectURL(file),
-                    }));
+                    }))
                   }
                 }}
               />
-              
             </div>
             <div className="text-center sm:text-left">
               <h1 className="text-2xl font-bold">{currentUser?.name}</h1>
               <p className="text-primary-100">
-                {currentUser?.role.charAt(0).toUpperCase() + currentUser?.role.slice(1)}
+                {currentUser?.role?.charAt(0)?.toUpperCase() + currentUser?.role?.slice(1)}
               </p>
               <p className="text-primary-100 flex items-center justify-center sm:justify-start mt-2">
                 <FaEnvelope className="mr-2" />
@@ -192,8 +212,6 @@ function Profile() {
                   </div>
                 </div>
                 
-                
-                
                 <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
                   
@@ -207,13 +225,24 @@ function Profile() {
                           <FaLock className="text-gray-400" />
                         </div>
                         <input
-                          type="password"
+                          type={showPasswords.oldPassword ? "text" : "password"}
                           name="oldPassword"
                           id="oldPassword"
                           value={formData.oldPassword}
                           onChange={handleInputChange}
-                          className="form-input pl-10"
+                          className="form-input pl-10 pr-10"
                         />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => togglePasswordVisibility('oldPassword')}
+                        >
+                          {showPasswords.oldPassword ? (
+                            <FaEyeSlash className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          ) : (
+                            <FaEye className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          )}
+                        </button>
                       </div>
                     </div>
                     
@@ -226,13 +255,24 @@ function Profile() {
                           <FaLock className="text-gray-400" />
                         </div>
                         <input
-                          type="password"
+                          type={showPasswords.newPassword ? "text" : "password"}
                           name="newPassword"
                           id="newPassword"
                           value={formData.newPassword}
                           onChange={handleInputChange}
-                          className="form-input pl-10"
+                          className="form-input pl-10 pr-10"
                         />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => togglePasswordVisibility('newPassword')}
+                        >
+                          {showPasswords.newPassword ? (
+                            <FaEyeSlash className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          ) : (
+                            <FaEye className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          )}
+                        </button>
                       </div>
                       <p className="mt-1 text-xs text-gray-500">
                         Leave blank to keep your current password.
@@ -248,13 +288,24 @@ function Profile() {
                           <FaLock className="text-gray-400" />
                         </div>
                         <input
-                          type="password"
+                          type={showPasswords.confirmPassword ? "text" : "password"}
                           name="confirmPassword"
                           id="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
-                          className="form-input pl-10"
+                          className="form-input pl-10 pr-10"
                         />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => togglePasswordVisibility('confirmPassword')}
+                        >
+                          {showPasswords.confirmPassword ? (
+                            <FaEyeSlash className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          ) : (
+                            <FaEye className="h-5 w-5 text-gray-400 hover:text-gray-500" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -294,7 +345,7 @@ function Profile() {
                   <div className="py-3 flex justify-between">
                     <dt className="font-medium text-gray-500">Role</dt>
                     <dd className="text-gray-900">
-                      {currentUser?.role.charAt(0).toUpperCase() + currentUser?.role.slice(1)}
+                      {currentUser?.role?.charAt(0)?.toUpperCase() + currentUser?.role?.slice(1)}
                     </dd>
                   </div>
                   <div className="py-3 flex justify-between">

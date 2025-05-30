@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
-import { useActivityTracker } from './hooks/useActivityTracker' // ✅ добавь
+import { useActivityTracker } from './hooks/useActivityTracker' 
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { ProjectsProvider } from './context/ProjectsContext'
@@ -33,15 +33,15 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   const { checkAuth } = useAuth()
-  const { startTracking, stopTracking } = useActivityTracker() // ✅
+  const { startTracking, stopTracking } = useActivityTracker() 
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
 
   useEffect(() => {
-    startTracking() // ✅ стартуем трекинг при монтировании
-    return () => stopTracking() // ✅ выключаем при размонтировании
+    startTracking() 
+    return () => stopTracking() 
   }, [startTracking, stopTracking])
 
   return (
