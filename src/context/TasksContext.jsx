@@ -5,7 +5,7 @@ import axios from 'axios';
 axios.defaults.baseURL = 'http://localhost:3000/api';
 
 const TasksContext = createContext();
-const filteredTasks = tasks;
+
 export function useTasks() {
   return useContext(TasksContext);
 }
@@ -14,6 +14,7 @@ export function TasksProvider({ children }) {
   const { currentUser, token } = useAuth();
   const [tasks, setTasks] = useState([]);
 
+  // 🔄 Загрузка задач
   const fetchTasks = useCallback(async () => {
     if (!token) return;
     try {
@@ -31,6 +32,7 @@ export function TasksProvider({ children }) {
     fetchTasks();
   }, [fetchTasks]);
 
+  // 📤 Фильтрация задач
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
 
@@ -39,6 +41,7 @@ export function TasksProvider({ children }) {
       : [];
 
     if (currentUser.role === 'admin') return validTasks;
+
     if (currentUser.role === 'manager') {
       return validTasks.filter(
         t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
@@ -48,6 +51,7 @@ export function TasksProvider({ children }) {
     return validTasks.filter(t => t.assignedTo === currentUser.id);
   }, [currentUser, tasks]);
 
+  // 🧠 Группировка по статусам
   const getTasksByStatus = useCallback(() => {
     return {
       todo: filteredTasks.filter(t => t.status === 'todo'),
@@ -57,6 +61,10 @@ export function TasksProvider({ children }) {
     };
   }, [filteredTasks]);
 
+  // 🔍 Получение отфильтрованных задач
+  const getFilteredTasks = useCallback(() => filteredTasks, [filteredTasks]);
+
+  // ➕ Создание задачи
   const createTask = async (taskData) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -85,18 +93,19 @@ export function TasksProvider({ children }) {
     }
   };
 
+  // ✏️ Обновление задачи
   const updateTask = async (id, updates) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
     const task = tasks.find(t => t?.id === id || t?.id === parseInt(id));
     if (!task) return { success: false, error: 'Task not found' };
 
-  if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
-    return { success: false, error: 'Permission denied' };
-  }
+    if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
+      return { success: false, error: 'Permission denied' };
+    }
 
     if ((updates.title || updates.description || updates.assignedTo) &&
-      !['admin', 'manager'].includes(currentUser.role)) {
+        !['admin', 'manager'].includes(currentUser.role)) {
       return { success: false, error: 'Permission denied' };
     }
 
@@ -116,6 +125,7 @@ export function TasksProvider({ children }) {
     }
   };
 
+  // ❌ Удаление задачи
   const deleteTask = async (id) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -129,7 +139,6 @@ export function TasksProvider({ children }) {
       });
 
       setTasks(prev => prev.filter(t => t.id !== id));
-      setTasks(prev => prev.filter(t => t.id !== id));
       return { success: true };
     } catch (err) {
       console.error('Task deletion failed:', err);
@@ -140,6 +149,7 @@ export function TasksProvider({ children }) {
     }
   };
 
+  // 🌐 Контекстные значения
   const value = {
     tasks,
     filteredTasks,
@@ -147,8 +157,7 @@ export function TasksProvider({ children }) {
     createTask,
     updateTask,
     deleteTask,
-    getFilteredTasks,
-    getTasksByStatus
+    getFilteredTasks
   };
 
   return (
@@ -158,4 +167,4 @@ export function TasksProvider({ children }) {
   );
 }
 
-export default TasksContext;  
+export default TasksContext;

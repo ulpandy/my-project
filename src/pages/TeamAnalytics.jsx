@@ -17,6 +17,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 function TeamAnalytics() {
   const { filteredTasks } = useTasks()
+  const [userRoles, setUserRoles] = useState({})
   const [teamMetrics, setTeamMetrics] = useState({
     totalMembers: 0,
     activeMembers: 0,
@@ -38,6 +39,13 @@ function TeamAnalytics() {
 
         const active = users.filter(u => u.is_active).length
 
+        // 🗺️ строим мапу: username → role
+        const rolesMap = {}
+        users.forEach(user => {
+          rolesMap[user.username] = user.id
+        })
+
+        setUserRoles(rolesMap)
         setTeamMetrics(prev => ({
           ...prev,
           totalMembers: users.length,
@@ -75,8 +83,9 @@ function TeamAnalytics() {
     Worker: { total: 0, done: 0 }
   }
 
+  // 🧮 Группировка по ролям через username
   filteredTasks.forEach(task => {
-    const role = task.assignedUser?.role || 'Worker'
+    const role = userRoles[task.assignedTo] || 'Worker' // now using username as key
     if (taskCountsByRole[role] !== undefined) {
       taskCountsByRole[role] += 1
     }
