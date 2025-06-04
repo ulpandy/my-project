@@ -29,6 +29,7 @@ console.log("👤 Current user:", currentUser?.id);
     title: '',
     description: '',
     assignedTo: '',
+    assignedRole: 'Worker',
     priority: 'medium'
   });
 
@@ -157,18 +158,22 @@ console.log("👤 Current user:", currentUser?.id);
   });
 
   const handleCreateTask = async () => {
-    const result = await createTask(newTask);
-    if (!result.success) {
-      alert(result.error || 'Failed to create task');
-    }
-    setNewTask({
-      title: '',
-      description: '',
-      assignedTo: '',
-      priority: 'medium'
-    });
-    setIsCreating(false);
-  };
+  const result = await createTask(newTask);
+
+  if (!result.success) {
+    alert(result.error || 'Failed to create task');
+  }
+
+  setNewTask({
+    title: '',
+    description: '',
+    assignedTo: '',
+    assignedRole: 'Worker', 
+    priority: 'medium'
+  });
+
+  setIsCreating(false);
+};
 
   const handleDelete = async (taskId) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
@@ -225,7 +230,14 @@ console.log("👤 Current user:", currentUser?.id);
               <select
                 className="form-input mt-1"
                 value={newTask.assignedTo}
-                onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                onChange={e => {
+                  const selectedUser = availableUsers.find(u => u.id === e.target.value)
+                  setNewTask({
+                    ...newTask,
+                    assignedTo: e.target.value,
+                    assignedRole: selectedUser?.role || 'Worker'
+                  })
+                }}
               >
                 <option value="">Select user</option>
                 {availableUsers.map(user => (

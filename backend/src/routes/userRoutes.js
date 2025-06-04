@@ -1,5 +1,5 @@
 const express = require('express');
-const { getCurrentUser, updateCurrentUser, getAllUsers, updateAvatar } = require('../controllers/userController');
+const { getCurrentUser, updateCurrentUser, getAllUsers, updateAvatar, getUsersWithActivity } = require('../controllers/userController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { apiRateLimiter } = require('../middleware/rateLimiter');
 const multer = require('multer');
@@ -19,8 +19,11 @@ router.put('/me', updateCurrentUser);
 
 // Admin-only routes
 router.get('/', authorize('admin', 'manager'), getAllUsers);
+router.get('/with-activity', authenticate, authorize('admin', 'manager'), getUsersWithActivity);
 
 // Avatar upload route
 router.patch('/avatar', authenticate, upload.single('avatar'), updateAvatar);
+
+
 
 module.exports = router;

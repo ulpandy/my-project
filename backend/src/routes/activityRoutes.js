@@ -1,5 +1,5 @@
 const express = require('express');
-const { logActivity, getActivityStats , downloadActivityPdf } = require('../controllers/activityController');
+const { logActivity, getActivityStats , downloadActivityPdf , getPerUserActivityStats } = require('../controllers/activityController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { apiRateLimiter } = require('../middleware/rateLimiter');
 
@@ -14,5 +14,6 @@ router.use(apiRateLimiter);
 router.post('/', logActivity);
 router.get('/stats', authorize('admin', 'manager'), getActivityStats);
 router.get('/pdf', authorize('admin', 'manager'), downloadActivityPdf);
+router.get('/per-user-stats', authenticate, getPerUserActivityStats)
 
 module.exports = router;

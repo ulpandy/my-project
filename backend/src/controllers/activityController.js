@@ -53,22 +53,20 @@ const logActivity = async (req, res, next) => {
   }
 };
 
-
-// Get activity statistics
+// Get aggregated activity statistics
 const getActivityStats = async (req, res, next) => {
   try {
     const { userId, startDate, endDate } = req.query;
 
-      let userEmail = null;
+    let userEmail = null;
 
-      if (userId) {
-        const emailRes = await db.query('SELECT email FROM users WHERE id = $1', [userId]);
-        if (emailRes.rows.length > 0) {
-          userEmail = emailRes.rows[0].email;
-        }
+    if (userId) {
+      const emailRes = await db.query('SELECT email FROM users WHERE id = $1', [userId]);
+      if (emailRes.rows.length > 0) {
+        userEmail = emailRes.rows[0].email;
       }
+    }
 
-    // Validate date range
     if (!startDate || !endDate) {
       throw new ApiError(400, 'Start date and end date are required');
     }
@@ -88,7 +86,6 @@ const getActivityStats = async (req, res, next) => {
     const queryParams = [startDate, endDate];
     let paramIndex = 3;
 
-    // Filter by user if provided
     if (userId) {
       query += ` AND user_id = $${paramIndex}`;
       queryParams.push(userId);
@@ -96,10 +93,8 @@ const getActivityStats = async (req, res, next) => {
 
     const result = await db.query(query, queryParams);
 
-    // Format the results
     const stats = result.rows[0];
     if (!stats.totalClicks) {
-      // No data for the period
       res.status(200).json({
         totalClicks: 0,
         totalKeyPresses: 0,
@@ -110,12 +105,41 @@ const getActivityStats = async (req, res, next) => {
     }
 
     res.status(200).json({
-    user: userEmail || userId || 'All users',
-    totalClicks: parseInt(stats.totalClicks) || 0,
-    totalKeyPresses: parseInt(stats.totalKeyPresses) || 0,
-    totalMouseMovements: parseInt(stats.totalMouseMovements) || 0,
-    averageActivityPerHour: parseFloat(stats.averageActivityPerHour) || 0
+      user: userEmail || userId || 'All users',
+      totalClicks: parseInt(stats.totalClicks) || 0,
+      totalKeyPresses: parseInt(stats.totalKeyPresses) || 0,
+      totalMouseMovements: parseInt(stats.totalMouseMovements) || 0,
+      averageActivityPerHour: parseFloat(stats.averageActivityPerHour) || 0
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// NEW: Get per-user aggregated activity data
+const getPerUserActivityStats = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      throw new ApiError(400, 'Start date and end date are required');
+    }
+
+    const result = await db.query(`
+      SELECT 
+        users.id as "userId",
+        users.email as "username",
+        COALESCE(SUM((data->>'mouseClicks')::int), 0) as "mouseTime",
+        COALESCE(SUM((data->>'keyPresses')::int), 0) as "keyboardTime",
+        COALESCE(SUM((data->>'mouseMovements')::int), 0) as "idleTime"
+      FROM activity_logs
+      JOIN users ON activity_logs.user_id = users.id
+      WHERE type = 'user-activity' AND timestamp BETWEEN $1 AND $2
+      GROUP BY users.id, users.email
+      ORDER BY users.email
+    `, [startDate, endDate]);
+
+    res.status(200).json(result.rows);
   } catch (error) {
     next(error);
   }
@@ -143,7 +167,6 @@ const downloadActivityPdf = async (req, res, next) => {
     const result = await db.query(query, queryParams);
     const logs = result.rows;
 
-    // Аналитика
     const summary = {
       totalEvents: logs.length,
       activityEvents: 0,
@@ -205,5 +228,6 @@ const downloadActivityPdf = async (req, res, next) => {
 module.exports = {
   logActivity,
   getActivityStats,
+  getPerUserActivityStats, // ← добавь эту строку
   downloadActivityPdf
 };

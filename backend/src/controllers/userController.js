@@ -102,10 +102,35 @@ const updateAvatar = async (req, res, next) => {
   }
 };
 
+const getUsersWithActivity = async (req, res, next) => {
+  try {
+    const result = await db.query(`
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        EXISTS (
+          SELECT 1
+          FROM activity_logs a
+          WHERE a.user_id = u.id
+            AND a.timestamp >= NOW() - INTERVAL '24 hours'
+        ) AS is_active
+      FROM users u
+    `);
+
+    res.status(200).json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
 
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
   getAllUsers,
   updateAvatar,
+  getUsersWithActivity
 };

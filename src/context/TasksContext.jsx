@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import axios from 'axios';
 
 axios.defaults.baseURL = 'http://localhost:3000/api';
 
 const TasksContext = createContext();
-
+const filteredTasks = tasks;
 export function useTasks() {
   return useContext(TasksContext);
 }
@@ -30,6 +30,32 @@ export function TasksProvider({ children }) {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (!currentUser) return [];
+
+    const validTasks = Array.isArray(tasks)
+      ? tasks.filter(t => t && typeof t === 'object' && 'status' in t)
+      : [];
+
+    if (currentUser.role === 'admin') return validTasks;
+    if (currentUser.role === 'manager') {
+      return validTasks.filter(
+        t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
+      );
+    }
+
+    return validTasks.filter(t => t.assignedTo === currentUser.id);
+  }, [currentUser, tasks]);
+
+  const getTasksByStatus = useCallback(() => {
+    return {
+      todo: filteredTasks.filter(t => t.status === 'todo'),
+      inprogress: filteredTasks.filter(t => t.status === 'inprogress'),
+      done: filteredTasks.filter(t => t.status === 'done'),
+      frozen: filteredTasks.filter(t => t.status === 'frozen')
+    };
+  }, [filteredTasks]);
 
   const createTask = async (taskData) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
@@ -65,9 +91,9 @@ export function TasksProvider({ children }) {
     const task = tasks.find(t => t?.id === id || t?.id === parseInt(id));
     if (!task) return { success: false, error: 'Task not found' };
 
-    if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
-      return { success: false, error: 'Permission denied' };
-    }
+  if (updates.status && currentUser.role === 'worker' && task.assignedTo !== currentUser.id) {
+    return { success: false, error: 'Permission denied' };
+  }
 
     if ((updates.title || updates.description || updates.assignedTo) &&
       !['admin', 'manager'].includes(currentUser.role)) {
@@ -80,12 +106,9 @@ export function TasksProvider({ children }) {
       });
 
       const updated = res.data;
-      if (!updated?.id) throw new Error('Invalid task format');
-
       setTasks(prev => prev.map(t => (t.id === updated.id ? updated : t)));
       return { success: true, task: updated };
     } catch (err) {
-      console.error('Task update failed:', err);
       return {
         success: false,
         error: err.response?.data?.message || 'Update failed'
@@ -106,6 +129,7 @@ export function TasksProvider({ children }) {
       });
 
       setTasks(prev => prev.filter(t => t.id !== id));
+      setTasks(prev => prev.filter(t => t.id !== id));
       return { success: true };
     } catch (err) {
       console.error('Task deletion failed:', err);
@@ -116,35 +140,10 @@ export function TasksProvider({ children }) {
     }
   };
 
-  const getFilteredTasks = useCallback(() => {
-    if (!currentUser) return [];
-
-    const validTasks = tasks.filter(t => t && typeof t === 'object' && 'status' in t);
-
-    if (currentUser.role === 'admin') return validTasks;
-
-    if (currentUser.role === 'manager') {
-      return validTasks.filter(
-        t => t.createdBy === currentUser.id || t.assignedTo === currentUser.id
-      );
-    }
-
-    return validTasks.filter(t => t.assignedTo === currentUser.id);
-  }, [currentUser, tasks]);
-
-  const getTasksByStatus = useCallback(() => {
-    const filtered = getFilteredTasks();
-    return {
-      todo: filtered.filter(t => t.status === 'todo'),
-      inprogress: filtered.filter(t => t.status === 'inprogress'),
-      done: filtered.filter(t => t.status === 'done'),
-      frozen: filtered.filter(t => t.status === 'frozen')
-    };
-  }, [getFilteredTasks]);
-
   const value = {
     tasks,
-    fetchTasks,
+    filteredTasks,
+    getTasksByStatus,
     createTask,
     updateTask,
     deleteTask,
@@ -159,4 +158,4 @@ export function TasksProvider({ children }) {
   );
 }
 
-export default TasksContext;
+export default TasksContext;  

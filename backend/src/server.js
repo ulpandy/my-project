@@ -10,6 +10,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const activityRoutes = require('./routes/activityRoutes');
 const uploadsPath = path.join(__dirname, 'uploads');
 const projectRoutes = require('./routes/projectRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes')
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/analytics', analyticsRoutes)
 
 
 // Health check endpoint
