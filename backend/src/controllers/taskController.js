@@ -1,11 +1,12 @@
 const { ApiError } = require('../middleware/errorHandler');
 const { logger } = require('../utils/logger');
 const db = require('../config/database');
+const { validate: isUUID } = require('uuid');
 
-// Get tasks with filtering
+// Получение задач с фильтрацией
 const getTasks = async (req, res, next) => {
   try {
-    const { status, assignedTo } = req.query;
+    const { status, assignedTo, projectId } = req.query;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -13,17 +14,20 @@ const getTasks = async (req, res, next) => {
       SELECT 
         t.id, t.title, t.description, t.status, t.priority,
         t.assigned_to as "assignedTo", t.created_by as "createdBy",
-        t.created_at as "createdAt",
-        u1.name as "assignedToName", u2.name as "createdByName"
+        t.project_id as "projectId",
+        t.created_at as "createdAt", t.updated_at as "updatedAt",
+        u1.name as "assignedToName", u2.name as "createdByName",
+        p.name as "projectName"
       FROM tasks t
       LEFT JOIN users u1 ON t.assigned_to = u1.id
       LEFT JOIN users u2 ON t.created_by = u2.id
+      LEFT JOIN projects p ON t.project_id = p.id
       WHERE 1=1
     `;
+
     const queryParams = [];
     let paramIndex = 1;
 
-    // Apply filters
     if (status) {
       query += ` AND t.status = $${paramIndex}`;
       queryParams.push(status);
@@ -36,99 +40,77 @@ const getTasks = async (req, res, next) => {
       paramIndex++;
     }
 
-    // Apply role-based filtering
+    if (projectId) {
+      query += ` AND t.project_id = $${paramIndex}`;
+      queryParams.push(projectId);
+      paramIndex++;
+    }
+
     if (userRole === 'worker') {
       query += ` AND t.assigned_to = $${paramIndex}`;
       queryParams.push(userId);
       paramIndex++;
     }
 
-    // Order by created_at
     query += ' ORDER BY t.created_at DESC';
 
     const result = await db.query(query, queryParams);
-
     res.status(200).json(result.rows);
   } catch (error) {
     next(error);
   }
 };
 
-// Create a new task
+// Создание новой задачи
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, assignedTo, priority } = req.body;
+    const { title, description, assignedTo, priority, projectId } = req.body;
     const createdBy = req.user.id;
 
-    console.log('CREATE TASK PAYLOAD:', { title, description, assignedTo, createdBy });
+    if (!title) throw new ApiError(400, 'Title is required');
+    if (!projectId || !isUUID(projectId)) throw new ApiError(400, 'Valid projectId is required');
+    if (!createdBy || !isUUID(createdBy)) throw new ApiError(400, 'Valid createdBy is required');
 
-    
-    // Validate required fields
-    if (!title) {
-      throw new ApiError(400, 'Title is required');
+    if (assignedTo && (!isUUID(assignedTo))) {
+      throw new ApiError(400, 'assignedTo must be a valid UUID if provided');
     }
 
-if (assignedTo !== null && assignedTo !== undefined) {
-  if (typeof assignedTo !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(assignedTo)) {
-    throw new ApiError(400, 'assignedTo must be a valid UUID if provided');
-  }
-}
-    if (!createdBy || typeof createdBy !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(createdBy)) {
-      throw new ApiError(400, 'Valid createdBy UUID is required');
-    }
-    
-    // Create the task
     const result = await db.query(
-      `INSERT INTO tasks (title, description, assigned_to, priority, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO tasks (title, description, assigned_to, priority, created_by, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING 
          id, title, description, status, priority,
          assigned_to as "assignedTo", created_by as "createdBy",
-         created_at as "createdAt"`,
-      [title, description, assignedTo, priority || 'medium', createdBy]
+         project_id as "projectId", created_at as "createdAt"`,
+      [title, description, assignedTo, priority || 'medium', createdBy, projectId]
     );
 
     logger.info(`Task created: ${result.rows[0].id}`);
-
     res.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
   }
 };
 
-
-
-// Update a task
+// Обновление задачи
 const updateTask = async (req, res, next) => {
   try {
-    
     const taskId = req.params.id;
-    const { validate: isUUID } = require('uuid');
-    if (!isUUID(taskId)) {
-      throw new ApiError(400, 'Invalid UUID format for task ID');
-    }
-    const { title, description, status, assignedTo, priority } = req.body;
+    const { title, description, status, assignedTo, priority, projectId } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // Check if task exists
-    const taskCheck = await db.query(
-      'SELECT * FROM tasks WHERE id = $1',
-      [taskId]
-    );
+    if (!isUUID(taskId)) throw new ApiError(400, 'Invalid UUID format for task ID');
+    if (projectId && !isUUID(projectId)) throw new ApiError(400, 'Invalid projectId');
 
-    if (taskCheck.rows.length === 0) {
-      throw new ApiError(404, 'Task not found');
-    }
+    const taskCheck = await db.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rows.length === 0) throw new ApiError(404, 'Task not found');
 
     const task = taskCheck.rows[0];
-
-    // Check permissions
     if (userRole === 'worker' && task.assigned_to !== userId) {
       throw new ApiError(403, 'You can only update tasks assigned to you');
     }
 
-    // Update the task
     const result = await db.query(
       `UPDATE tasks
        SET title = COALESCE($1, title),
@@ -136,43 +118,35 @@ const updateTask = async (req, res, next) => {
            status = COALESCE($3, status),
            assigned_to = COALESCE($4, assigned_to),
            priority = COALESCE($5, priority),
+           project_id = COALESCE($6, project_id),
            updated_at = NOW()
-       WHERE id = $6
+       WHERE id = $7
        RETURNING 
          id, title, description, status, priority,
          assigned_to as "assignedTo", created_by as "createdBy",
-         created_at as "createdAt", updated_at as "updatedAt"`,
-      [title, description, status, assignedTo, priority, taskId]
+         project_id as "projectId", created_at as "createdAt", updated_at as "updatedAt"`,
+      [title, description, status, assignedTo, priority, projectId, taskId]
     );
 
     logger.info(`Task updated: ${taskId}`);
-
     res.status(200).json(result.rows[0]);
   } catch (error) {
     next(error);
   }
 };
 
-// Delete a task
+// Удаление задачи
 const deleteTask = async (req, res, next) => {
   try {
     const taskId = req.params.id;
+    if (!isUUID(taskId)) throw new ApiError(400, 'Invalid UUID format for task ID');
 
-    // Check if task exists
-    const taskCheck = await db.query(
-      'SELECT * FROM tasks WHERE id = $1',
-      [taskId]
-    );
+    const taskCheck = await db.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskCheck.rows.length === 0) throw new ApiError(404, 'Task not found');
 
-    if (taskCheck.rows.length === 0) {
-      throw new ApiError(404, 'Task not found');
-    }
-
-    // Delete the task
     await db.query('DELETE FROM tasks WHERE id = $1', [taskId]);
 
     logger.info(`Task deleted: ${taskId}`);
-
     res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error) {
     next(error);

@@ -78,10 +78,45 @@ const updateProject = async (req, res, next) => {
   res.status(200).json(result.rows[0]);
 }
 
+// Get projects with summary
+const getProjectsWithSummary = async (req, res, next) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        p.id,
+        p.name,
+        p.description,
+        p.start_date,
+        p.deadline,
+        p.status,
+        p.created_by,
+        p.created_at,
+        p.updated_at,
+        COUNT(t.id) AS total_tasks,
+        SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS completed_tasks,
+        -- Проект считается "on track", если есть задачи и не менее 50% выполнено
+        CASE 
+          WHEN COUNT(t.id) = 0 THEN false
+          WHEN SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END)::float / COUNT(t.id) >= 0.5 THEN true
+          ELSE false
+        END AS on_track
+      FROM projects p
+      LEFT JOIN tasks t ON t.project_id = p.id
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `);
+
+    res.status(200).json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 module.exports = {
   getProjects,
   createProject,
   deleteProject,
-  updateProject
+  updateProject,
+  getProjectsWithSummary
 };

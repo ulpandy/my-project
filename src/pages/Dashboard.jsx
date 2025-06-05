@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { FaPlus, FaTasks } from 'react-icons/fa';
 import { useTasks } from '../context/TasksContext';
 import { useAuth } from '../context/AuthContext';
-import { useActivityTracker } from '../hooks/useActivityTracker'; // ← ДОБАВЛЕНО
+import { useActivityTracker } from '../hooks/useActivityTracker';
 import TaskColumn from '../components/TaskColumn';
 
 function Dashboard() {
   const { tasks, getTasksByStatus, createTask } = useTasks();
   const { currentUser } = useAuth();
-  const { startTracking } = useActivityTracker(); // ← ДОБАВЛЕНО
+  const { startTracking } = useActivityTracker();
 
   const [tasksByStatus, setTasksByStatus] = useState({
     todo: [],
@@ -22,12 +22,13 @@ function Dashboard() {
     title: '',
     description: '',
     assignedTo: '',
-    priority: 'medium'
+    priority: 'medium',
+    projectId: ''
   });
 
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableProjects, setAvailableProjects] = useState([]);
 
-  // 🔥 НАЧАЛО ТРЕКИНГА АКТИВНОСТИ
   useEffect(() => {
     startTracking();
     console.log('🔥 Activity tracking started');
@@ -39,15 +40,13 @@ function Dashboard() {
   }, [tasks, getTasksByStatus]);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+
     const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:3000/api/users', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+        const res = await fetch('/api/users', {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        if (!res.ok) throw new Error('Failed to fetch users');
         const data = await res.json();
         setAvailableUsers(data);
       } catch (error) {
@@ -55,8 +54,21 @@ function Dashboard() {
       }
     };
 
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('/api/projects', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setAvailableProjects(data);
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      }
+    };
+
     if (['admin', 'manager'].includes(currentUser?.role)) {
       fetchUsers();
+      fetchProjects();
     }
   }, [currentUser]);
 
@@ -66,7 +78,7 @@ function Dashboard() {
   };
 
   const handleSaveTask = async () => {
-    if (!newTask.title.trim()) return;
+    if (!newTask.title.trim() || !newTask.projectId) return;
 
     const payload = {
       ...newTask,
@@ -80,7 +92,8 @@ function Dashboard() {
         title: '',
         description: '',
         assignedTo: '',
-        priority: 'medium'
+        priority: 'medium',
+        projectId: ''
       });
       setIsCreatingTask(false);
     } else {
@@ -94,7 +107,8 @@ function Dashboard() {
       title: '',
       description: '',
       assignedTo: '',
-      priority: 'medium'
+      priority: 'medium',
+      projectId: ''
     });
   };
 
@@ -114,67 +128,52 @@ function Dashboard() {
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <h2 className="text-lg font-semibold mb-4">Create New Task</h2>
           <div className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title *</label>
-              <input
-                type="text"
-                id="title"
-                className="form-input mt-1"
-                value={newTask.title}
-                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                id="description"
-                className="form-input mt-1"
-                value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                rows={3}
-              ></textarea>
-            </div>
-
-            <div>
-              <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700">Assigned To</label>
-              <select
-                id="assignedTo"
-                className="form-input mt-1"
-                value={newTask.assignedTo}
-                onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-              >
-                <option value="">Select a user</option>
-                {availableUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} ({user.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="priority" className="block text-sm font-medium text-gray-700">Priority</label>
-              <select
-                id="priority"
-                className="form-input mt-1"
-                value={newTask.priority}
-                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Title"
+              value={newTask.title}
+              onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+            />
+            <textarea
+              className="form-input"
+              placeholder="Description"
+              value={newTask.description}
+              onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+            />
+            <select
+              className="form-input"
+              value={newTask.assignedTo}
+              onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
+            >
+              <option value="">Select user</option>
+              {availableUsers.map(user => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))}
+            </select>
+            <select
+              className="form-input"
+              value={newTask.priority}
+              onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <select
+              className="form-input"
+              value={newTask.projectId}
+              onChange={e => setNewTask({ ...newTask, projectId: e.target.value })}
+              required
+            >
+              <option value="">Select project</option>
+              {availableProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
             <div className="flex justify-end space-x-2">
-              <button onClick={handleCancelTask} className="btn-outline">
-                Cancel
-              </button>
-              <button onClick={handleSaveTask} className="btn-primary">
-                Save Task
-              </button>
+              <button onClick={handleCancelTask} className="btn-outline">Cancel</button>
+              <button onClick={handleSaveTask} className="btn-primary">Save Task</button>
             </div>
           </div>
         </div>
@@ -191,16 +190,7 @@ function Dashboard() {
         <div className="mt-8 text-center p-8 bg-white rounded-lg shadow-sm">
           <FaTasks className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h2 className="text-xl font-medium text-gray-900 mb-2">No tasks available</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            {['admin', 'manager'].includes(currentUser?.role)
-              ? "You don't have any tasks yet. Create a new task to get started."
-              : "You don't have any assigned tasks yet. Tasks assigned to you will appear here."}
-          </p>
-          {['admin', 'manager'].includes(currentUser?.role) && (
-            <button onClick={handleCreateTask} className="mt-4 btn-primary">
-              Create Your First Task
-            </button>
-          )}
+          <p className="text-gray-500">You don\'t have any tasks yet. Create a new task to get started.</p>
         </div>
       )}
     </div>

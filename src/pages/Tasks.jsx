@@ -13,14 +13,6 @@ import { useTasks } from '../context/TasksContext';
 function Tasks() {
   const { currentUser } = useAuth();
   const { tasks, getFilteredTasks, createTask, deleteTask } = useTasks();
-console.log("📦 Raw tasks:", tasks);
-  const filteredTasks = useMemo(() => {
-  const result = getFilteredTasks();
-  console.log("🎯 Filtered tasks:", result);
-  return result;
-}, [tasks, getFilteredTasks]);
-
-console.log("👤 Current user:", currentUser?.id);
 
   const [sorting, setSorting] = useState([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -30,19 +22,19 @@ console.log("👤 Current user:", currentUser?.id);
     description: '',
     assignedTo: '',
     assignedRole: 'Worker',
-    priority: 'medium'
+    priority: 'medium',
+    projectId: ''
   });
 
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableProjects, setAvailableProjects] = useState([]);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem('token');
         const res = await fetch('http://localhost:3000/api/users', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to fetch users');
         const data = await res.json();
@@ -52,8 +44,25 @@ console.log("👤 Current user:", currentUser?.id);
       }
     };
 
+    const fetchProjects = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:3000/api/projects', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch projects');
+        const data = await res.json();
+        setAvailableProjects(data);
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      }
+    };
+
     fetchUsers();
+    fetchProjects();
   }, []);
+
+  const filteredTasks = useMemo(() => getFilteredTasks(), [tasks, getFilteredTasks]);
 
   const columns = useMemo(() => [
     {
@@ -101,27 +110,19 @@ console.log("👤 Current user:", currentUser?.id);
       header: 'Assigned To',
       cell: info => {
         const task = info.row.original;
-        return (
-          <div>
-            {task.assignedToName || '—'}
-          </div>
-        );
+        return <div>{task.assignedToName || '—'}</div>;
       }
     },
     {
-      accessorKey: 'timeSpent',
-      header: 'Time Spent',
+      accessorKey: 'project',
+      header: 'Project',
       cell: info => {
-        const task = info.row?.original;
-        if (!task || !task.startTime) return '—';
-        try {
-          const end = task.endTime ? new Date(task.endTime) : new Date();
-          const start = new Date(task.startTime);
-          const hours = Math.round((end - start) / (1000 * 60 * 60));
-          return `${hours}h`;
-        } catch {
-          return '—';
-        }
+        const task = info.row.original;
+        return (
+          <div>
+            {task.projectName || '—'}
+          </div>
+        );
       }
     },
     {
@@ -158,22 +159,28 @@ console.log("👤 Current user:", currentUser?.id);
   });
 
   const handleCreateTask = async () => {
-  const result = await createTask(newTask);
+    const taskToSend = { ...newTask };
+    if (!taskToSend.projectId) {
+      delete taskToSend.projectId; // предотвратить ошибку UUID
+    }
 
-  if (!result.success) {
-    alert(result.error || 'Failed to create task');
-  }
+    const result = await createTask(taskToSend);
 
-  setNewTask({
-    title: '',
-    description: '',
-    assignedTo: '',
-    assignedRole: 'Worker', 
-    priority: 'medium'
-  });
+    if (!result.success) {
+      alert(result.error || 'Failed to create task');
+    }
 
-  setIsCreating(false);
-};
+    setNewTask({
+      title: '',
+      description: '',
+      assignedTo: '',
+      assignedRole: 'Worker',
+      priority: 'medium',
+      projectId: ''
+    });
+
+    setIsCreating(false);
+  };
 
   const handleDelete = async (taskId) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
@@ -231,12 +238,12 @@ console.log("👤 Current user:", currentUser?.id);
                 className="form-input mt-1"
                 value={newTask.assignedTo}
                 onChange={e => {
-                  const selectedUser = availableUsers.find(u => u.id === e.target.value)
+                  const selectedUser = availableUsers.find(u => u.id === e.target.value);
                   setNewTask({
                     ...newTask,
                     assignedTo: e.target.value,
                     assignedRole: selectedUser?.role || 'Worker'
-                  })
+                  });
                 }}
               >
                 <option value="">Select user</option>
@@ -257,6 +264,21 @@ console.log("👤 Current user:", currentUser?.id);
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Project</label>
+              <select
+                className="form-input mt-1"
+                value={newTask.projectId}
+                onChange={e => setNewTask({ ...newTask, projectId: e.target.value })}
+              >
+                <option value="">Select project</option>
+                {availableProjects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex justify-end space-x-2">
