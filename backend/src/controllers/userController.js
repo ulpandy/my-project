@@ -109,6 +109,7 @@ const getUsersWithActivity = async (req, res, next) => {
         u.id,
         u.name,
         u.email,
+        u.role,
         EXISTS (
           SELECT 1
           FROM activity_logs a

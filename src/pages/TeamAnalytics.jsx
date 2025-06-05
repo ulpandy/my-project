@@ -42,8 +42,8 @@ function TeamAnalytics() {
         // 🗺️ строим мапу: username → role
         const rolesMap = {}
         users.forEach(user => {
-          rolesMap[user.username] = user.id
-        })
+          rolesMap[user.id] = user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase();
+          })
 
         setUserRoles(rolesMap)
         setTeamMetrics(prev => ({
@@ -156,7 +156,21 @@ function TeamAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="card bg-white p-6">
           <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
-          <Bar data={taskDistributionData} options={{ responsive: true }} />
+              <Bar
+                data={taskDistributionData}
+                options={{
+                  responsive: true,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 1,     // 👈 шаг по оси Y
+                        precision: 0     // 👈 целые числа только
+                      }
+                    }
+                  }
+                }}
+              />
         </div>
 
         <div className="card bg-white p-6">
