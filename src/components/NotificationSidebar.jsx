@@ -1,62 +1,51 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FaBell, FaComment, FaTimes } from 'react-icons/fa'
 
 function NotificationSidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('notifications')
-  
-  // Mock data - in a real app, this would come from your backend
-  const notifications = [
-    {
-      id: 1,
-      type: 'task',
-      message: 'New task assigned: Update user interface',
-      time: '5 minutes ago',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'system',
-      message: 'System maintenance scheduled for tonight',
-      time: '1 hour ago',
-      read: true
+  const [notifications, setNotifications] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // ✅ Загрузка уведомлений с backend
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch('http://localhost:3000/api/notifications', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+        const data = await res.json()
+        setNotifications(data)
+      } catch (error) {
+        console.error('❌ Failed to fetch notifications:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
-  
-  const messages = [
-    {
-      id: 1,
-      sender: 'John Doe',
-      message: 'Hey, how&#39;s the progress on the new feature?',
-      time: '10 minutes ago',
-      read: false
-    },
-    {
-      id: 2,
-      sender: 'Jane Smith',
-      message: 'Team meeting at 3 PM today',
-      time: '2 hours ago',
-      read: true
-    }
-  ]
-  
+
+    fetchNotifications()
+  }, [])
+
   return (
     <>
-      {/* Toggle button */}
+      {/* 🔔 Кнопка открытия */}
       <button
         className="fixed right-4 top-20 bg-primary-600 text-white p-3 rounded-full shadow-lg hover:bg-primary-700 transition-colors"
         onClick={() => setIsOpen(true)}
       >
-        {activeTab === 'notifications' ? <FaBell /> : <FaComment />}
+        <FaBell />
       </button>
-      
-      {/* Sidebar */}
-      <div 
+
+      {/* 📬 Sidebar */}
+      <div
         className={`fixed right-0 top-0 h-full w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header */}
+        {/* 🔻 Header */}
         <div className="p-4 border-b flex justify-between items-center">
           <div className="flex space-x-4">
             <button
@@ -87,40 +76,33 @@ function NotificationSidebar() {
             <FaTimes />
           </button>
         </div>
-        
-        {/* Content */}
+
+        {/* 📥 Контент */}
         <div className="overflow-y-auto h-[calc(100vh-64px)]">
           {activeTab === 'notifications' ? (
             <div className="p-4 space-y-4">
-              {notifications.map(notification => (
-                <div
-                  key={notification.id}
-                  className={`p-3 rounded-lg ${
-                    notification.read ? 'bg-gray-50' : 'bg-primary-50'
-                  }`}
-                >
-                  <p className="text-sm text-gray-800">{notification.message}</p>
-                  <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                </div>
-              ))}
+              {loading ? (
+                <p className="text-gray-500">Loading...</p>
+              ) : notifications.length === 0 ? (
+                <p className="text-gray-500">No notifications</p>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`p-3 rounded-lg ${
+                      n.read ? 'bg-gray-50' : 'bg-primary-50'
+                    }`}
+                  >
+                    <p className="text-sm text-gray-800">{n.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(n.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           ) : (
-            <div className="p-4 space-y-4">
-              {messages.map(message => (
-                <div
-                  key={message.id}
-                  className={`p-3 rounded-lg ${
-                    message.read ? 'bg-gray-50' : 'bg-primary-50'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-gray-800">
-                    {message.sender}
-                  </p>
-                  <p className="text-sm text-gray-600">{message.message}</p>
-                  <p className="text-xs text-gray-500 mt-1">{message.time}</p>
-                </div>
-              ))}
-            </div>
+            <div className="p-4 text-gray-500">Messages not connected yet</div>
           )}
         </div>
       </div>

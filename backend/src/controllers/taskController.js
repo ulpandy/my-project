@@ -68,7 +68,6 @@ const createTask = async (req, res, next) => {
     const createdBy = req.user.id;
 
     if (!title) throw new ApiError(400, 'Title is required');
-    if (!projectId || !isUUID(projectId)) throw new ApiError(400, 'Valid projectId is required');
     if (!createdBy || !isUUID(createdBy)) throw new ApiError(400, 'Valid createdBy is required');
 
     if (assignedTo && (!isUUID(assignedTo))) {
@@ -82,7 +81,7 @@ const createTask = async (req, res, next) => {
          id, title, description, status, priority,
          assigned_to as "assignedTo", created_by as "createdBy",
          project_id as "projectId", created_at as "createdAt"`,
-      [title, description, assignedTo, priority || 'medium', createdBy, projectId]
+      [title, description, assignedTo, priority || 'medium', createdBy, projectId || null]
     );
 
     logger.info(`Task created: ${result.rows[0].id}`);
