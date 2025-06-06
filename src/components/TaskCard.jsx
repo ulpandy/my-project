@@ -12,7 +12,7 @@ function TaskCard({ task }) {
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description)
   const [elapsedTime, setElapsedTime] = useState(0)
-  
+
   useEffect(() => {
     let interval
     if (task.status === 'inprogress' && task.startTime) {
@@ -23,8 +23,7 @@ function TaskCard({ task }) {
     }
     return () => clearInterval(interval)
   }, [task.status, task.startTime])
-  
-  // Set up drag source
+
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'task',
     item: { id: task.id },
@@ -38,13 +37,13 @@ function TaskCard({ task }) {
       isDragging: !!monitor.isDragging(),
     }),
   }))
-  
+
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       deleteTask(task.id)
     }
   }
-  
+
   const handleSave = () => {
     updateTask(task.id, { title, description })
     setIsEditing(false)
@@ -64,12 +63,12 @@ function TaskCard({ task }) {
       timeSpent: elapsedTime
     })
   }
-  
+
   const formatTime = (ms) => {
     const duration = intervalToDuration({ start: 0, end: ms })
     return formatDuration(duration, { format: ['hours', 'minutes', 'seconds'] })
   }
-  
+
   const getPriorityBadge = () => {
     switch (task.priority) {
       case 'high':
@@ -82,7 +81,7 @@ function TaskCard({ task }) {
         return null
     }
   }
-  
+
   const getStatusIcon = () => {
     switch (task.status) {
       case 'todo':
@@ -97,9 +96,9 @@ function TaskCard({ task }) {
         return null
     }
   }
-  
+
   return (
-    <div 
+    <div
       ref={drag}
       className={`task-card ${isDragging ? 'opacity-50' : ''}`}
       style={{ opacity: isDragging ? 0.5 : 1 }}
@@ -121,18 +120,8 @@ function TaskCard({ task }) {
             rows={3}
           ></textarea>
           <div className="flex justify-end space-x-2">
-            <button 
-              className="btn-outline text-sm py-1 px-2"
-              onClick={() => setIsEditing(false)}
-            >
-              Cancel
-            </button>
-            <button 
-              className="btn-primary text-sm py-1 px-2"
-              onClick={handleSave}
-            >
-              Save
-            </button>
+            <button className="btn-outline text-sm py-1 px-2" onClick={() => setIsEditing(false)}>Cancel</button>
+            <button className="btn-primary text-sm py-1 px-2" onClick={handleSave}>Save</button>
           </div>
         </div>
       ) : (
@@ -144,9 +133,15 @@ function TaskCard({ task }) {
             </div>
             {getPriorityBadge()}
           </div>
-          
-          <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-          
+
+          <p className="text-sm text-gray-600 mb-1">{task.description}</p>
+
+          {task.projectName && (
+            <div className="text-xs text-gray-500 italic mb-2">
+              Project: {task.projectName}
+            </div>
+          )}
+
           {task.status === 'inprogress' && task.startTime && (
             <div className="flex items-center text-sm text-gray-500 mb-3">
               <FaClock className="mr-1" />
@@ -154,7 +149,6 @@ function TaskCard({ task }) {
             </div>
           )}
 
-          {/* Timer Controls */}
           {task.status === 'todo' && (
             <button
               onClick={handleStartTask}
@@ -174,22 +168,13 @@ function TaskCard({ task }) {
               Complete Task
             </button>
           )}
-          
-          {/* Actions */}
+
           {(currentUser.role === 'admin' || currentUser.role === 'manager') && (
             <div className="flex justify-end space-x-2 text-gray-500">
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="text-gray-500 hover:text-primary-600"
-                title="Edit task"
-              >
+              <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-primary-600" title="Edit task">
                 <FaEdit />
               </button>
-              <button 
-                onClick={handleDelete}
-                className="text-gray-500 hover:text-error-600"
-                title="Delete task"
-              >
+              <button onClick={handleDelete} className="text-gray-500 hover:text-error-600" title="Delete task">
                 <FaTrash />
               </button>
             </div>
