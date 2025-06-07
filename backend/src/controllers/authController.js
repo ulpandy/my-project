@@ -78,6 +78,8 @@ const login = async (req, res, next) => {
       [email]
     );
 
+    
+
     const user = result.rows[0];
 
     // Check if user exists and password is correct
@@ -91,6 +93,8 @@ const login = async (req, res, next) => {
     const token = generateToken(user);
     console.log('JWT Token:', token)
 
+    await db.query(`UPDATE users SET is_logged_in = true WHERE id = $1`, [user.id]);
+
     logger.info(`User logged in: ${user.id}`);
 
     // Return user info and token
@@ -101,22 +105,26 @@ const login = async (req, res, next) => {
       role: user.role,
       token,
     });
+
+    
+
   } catch (error) {
     next(error);
   }
 };
 
-// Logout user (JWT invalidation is handled client-side)
 const logout = async (req, res, next) => {
   try {
-    // For JWT, we can't invalidate the token server-side
-    // The client should remove the token from storage
-    
+    // Логируем выход
     logger.info(`User logged out: ${req.user.id}`);
-    
-    res.status(200).json({ 
-      message: 'Logged out successfully' 
-    });
+
+    // Обновляем флаг в БД
+    await db.query(
+      `UPDATE users SET is_logged_in = false WHERE id = $1`,
+      [req.user.id]
+    );
+
+    res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }

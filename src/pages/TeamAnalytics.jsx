@@ -12,6 +12,8 @@ import {
 import { Bar } from 'react-chartjs-2'
 import { FaUsers, FaTasks, FaCheckCircle, FaClock, FaFilePdf } from 'react-icons/fa'
 import { useTasks } from '../context/TasksContext'
+import axios from 'axios'
+import { saveAs } from 'file-saver'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement)
 
@@ -26,6 +28,26 @@ function TeamAnalytics() {
     averageCompletionTime: 0
   })
 
+  const downloadPdf = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const startDate = '2025-06-01'  // Можно сделать динамическим
+      const endDate = '2025-06-07'
+
+      const response = await axios.get('http://localhost:3000/api/activity/pdf', {
+        params: { startDate, endDate },
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      })
+
+      const pdfBlob = new Blob([response.data], { type: 'application/pdf' })
+      saveAs(pdfBlob, 'activity-report.pdf')
+    } catch (error) {
+      console.error('Failed to download PDF:', error)
+      alert('PDF download failed')
+    }
+  }
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -39,11 +61,10 @@ function TeamAnalytics() {
 
         const active = users.filter(u => u.is_active).length
 
-        // 🗺️ строим мапу: username → role
         const rolesMap = {}
         users.forEach(user => {
-          rolesMap[user.id] = user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase();
-          })
+          rolesMap[user.id] = user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()
+        })
 
         setUserRoles(rolesMap)
         setTeamMetrics(prev => ({
@@ -83,9 +104,8 @@ function TeamAnalytics() {
     Worker: { total: 0, done: 0 }
   }
 
-  // 🧮 Группировка по ролям через username
   filteredTasks.forEach(task => {
-    const role = userRoles[task.assignedTo] || 'Worker' // now using username as key
+    const role = userRoles[task.assignedTo] || 'Worker'
     if (taskCountsByRole[role] !== undefined) {
       taskCountsByRole[role] += 1
     }
@@ -138,8 +158,8 @@ function TeamAnalytics() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Team Analytics</h1>
         <button
-          onClick={() => alert('PDF download kept as stub')}
-          className="btn-outline flex items-center space-x-2"
+          onClick={downloadPdf}
+          className="btn-outline flex items-center space-x-2 px-4 py-2 rounded border border-blue-500 text-blue-500 hover:bg-blue-50 transition"
         >
           <FaFilePdf />
           <span>Download PDF</span>
@@ -156,35 +176,38 @@ function TeamAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="card bg-white p-6">
           <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
-              <Bar
-                data={taskDistributionData}
-                options={{
-                  responsive: true,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        stepSize: 1,     // 👈 шаг по оси Y
-                        precision: 0     // 👈 целые числа только
-                      }
-                    }
+          <Bar
+            data={taskDistributionData}
+            options={{
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    stepSize: 1,
+                    precision: 0
                   }
-                }}
-              />
+                }
+              }
+            }}
+          />
         </div>
 
         <div className="card bg-white p-6">
           <h2 className="text-lg font-semibold mb-4">Completion Rate</h2>
-          <Bar data={completionRateData} options={{
-            responsive: true,
-            scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                title: { display: true, text: '%' }
+          <Bar
+            data={completionRateData}
+            options={{
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100,
+                  title: { display: true, text: '%' }
+                }
               }
-            }
-          }} />
+            }}
+          />
         </div>
       </div>
     </div>

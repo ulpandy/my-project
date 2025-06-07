@@ -110,12 +110,12 @@ const getUsersWithActivity = async (req, res, next) => {
         u.name,
         u.email,
         u.role,
-        EXISTS (
-          SELECT 1
+        u.is_logged_in,
+        (
+          SELECT MAX(a.timestamp)
           FROM activity_logs a
           WHERE a.user_id = u.id
-            AND a.timestamp >= NOW() - INTERVAL '24 hours'
-        ) AS is_active
+        ) AS last_active
       FROM users u
     `);
 
@@ -124,6 +124,8 @@ const getUsersWithActivity = async (req, res, next) => {
     next(err);
   }
 };
+
+
 
 
 
