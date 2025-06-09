@@ -3,6 +3,10 @@ const { logger } = require('../utils/logger');
 const db = require('../config/database');
 const PDFDocument = require('pdfkit');
 const stream = require('stream');
+const path = require('path');
+const fs = require('fs');
+
+
 
 // Log activity
 const logActivity = async (req, res, next) => {
@@ -116,7 +120,8 @@ const getActivityStats = async (req, res, next) => {
   }
 };
 
-// NEW: Get per-user aggregated activity data
+
+// Генерация PDF-отчета
 const getPerUserActivityStats = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
@@ -145,10 +150,11 @@ const getPerUserActivityStats = async (req, res, next) => {
   }
 };
 
-// Generate PDF report
+// Генерация PDF-отчета
 const downloadActivityPdf = async (req, res, next) => {
   try {
     const { userId, startDate, endDate } = req.query;
+
     if (!startDate || !endDate) {
       throw new ApiError(400, 'Start date and end date are required');
     }
@@ -182,7 +188,7 @@ const downloadActivityPdf = async (req, res, next) => {
       }
     });
 
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 40 });
     const bufferStream = new stream.PassThrough();
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -191,43 +197,92 @@ const downloadActivityPdf = async (req, res, next) => {
     doc.pipe(bufferStream);
     bufferStream.pipe(res);
 
+    // 🧾 Заголовок
     doc.fontSize(20).text('User Activity Report', { align: 'center' }).moveDown();
 
+    // 📋 Даты и пользователь
     doc.fontSize(12).text(`User ID: ${userId || 'All users'}`);
     doc.text(`Start Date: ${startDate}`);
     doc.text(`End Date: ${endDate}`);
     doc.moveDown();
 
-    doc.text(`Total Events: ${summary.totalEvents}`);
-    doc.text(`Mouse/Keyboard Activity Events: ${summary.activityEvents}`);
-    doc.text(`Window Switches: ${summary.windowSwitches}`);
-    doc.text(`AI Tool Detections (ChatGPT etc): ${summary.aiDetections}`);
-    doc.moveDown().fontSize(14).text('Details:', { underline: true }).moveDown();
+    // 🔍 Сводка и анализ активности
+    const activeThreshold = 20;
+    const aiUsageLimit = 5;
+    const activityCount = summary.activityEvents;
+    const aiToolCount = summary.aiDetections;
 
+    doc.moveDown().fontSize(14).text('Summary & Evaluation:', { underline: true }).moveDown();
+
+    if (activityCount >= activeThreshold && aiToolCount <= aiUsageLimit) {
+      doc.fillColor('green').fontSize(12).text('✅ The user is considered ACTIVE based on the tracked events.');
+    } else {
+      doc.fillColor('red').fontSize(12).text('⚠️ The user is considered INACTIVE or LOW-ACTIVITY during this period.');
+    }
+
+    doc
+      .fillColor('black')
+      .fontSize(11)
+      .moveDown()
+      .text(`Activity threshold: ${activeThreshold} events. AI usage limit: ${aiUsageLimit} windows.`)
+      .text(`Actual user-activity events: ${activityCount}`)
+      .text(`AI tool detections: ${aiToolCount}`)
+      .moveDown()
+      .fontSize(10)
+      .text('The system classifies a user as active if the number of interaction events (mouse, keyboard) is above the threshold and the number of detected AI-related tools is within acceptable limits.');
+
+    // 📊 Таблица логов
+    doc.addPage();
+    doc.fontSize(14).text('Event Log Table:', { underline: true }).moveDown();
+
+    // 🧾 Заголовок таблицы
+    doc
+      .fontSize(11)
+      .fillColor('black')
+      .text('Time', 50, doc.y, { continued: true, width: 120 })
+      .text('Type', 170, doc.y, { continued: true, width: 70 })
+      .text('Clicks', 240, doc.y, { continued: true, width: 50 })
+      .text('Keys', 290, doc.y, { continued: true, width: 50 })
+      .text('Moves', 340, doc.y, { continued: true, width: 60 })
+      .text('URL', 400, doc.y, { continued: true, width: 160 })
+      .text('AI Tool', 560, doc.y)
+      .moveDown();
+
+    // 📄 Строки таблицы
     logs.forEach(log => {
       const time = new Date(log.timestamp).toLocaleString();
-      doc.fontSize(10).text(`[${time}] ${log.type}`);
-      if (log.type === 'user-activity') {
-        const { mouseClicks, keyPresses, mouseMovements } = log.data || {};
-        doc.text(` - Clicks: ${mouseClicks}, Keys: ${keyPresses}, Moves: ${mouseMovements}`);
-      } else if (log.type === 'window-switch') {
-        doc.text(` - Title: ${log.data?.title}`);
-        doc.text(` - URL: ${log.data?.url}`);
-        doc.text(` - AI tool? ${log.data?.isAiTool ? 'Yes' : 'No'}`);
-      }
-      doc.moveDown();
+      const isUserActivity = log.type === 'user-activity';
+      const isWindowSwitch = log.type === 'window-switch';
+
+      const clicks = isUserActivity ? log.data?.mouseClicks ?? 0 : '';
+      const keys = isUserActivity ? log.data?.keyPresses ?? 0 : '';
+      const moves = isUserActivity ? log.data?.mouseMovements ?? 0 : '';
+
+      const url = isWindowSwitch ? log.data?.url ?? '' : '';
+      const aiTool = isWindowSwitch ? (log.data?.isAiTool ? 'Yes' : 'No') : '';
+
+      doc
+        .fontSize(10)
+        .text(time, 50, doc.y, { continued: true, width: 120 })
+        .text(log.type, 170, doc.y, { continued: true, width: 70 })
+        .text(clicks.toString(), 240, doc.y, { continued: true, width: 50 })
+        .text(keys.toString(), 290, doc.y, { continued: true, width: 50 })
+        .text(moves.toString(), 340, doc.y, { continued: true, width: 60 })
+        .text(url, 400, doc.y, { continued: true, width: 160 })
+        .text(aiTool, 560, doc.y)
+        .moveDown();
     });
 
     doc.end();
-
   } catch (error) {
     next(error);
   }
 };
 
+
 module.exports = {
   logActivity,
   getActivityStats,
-  getPerUserActivityStats, // ← добавь эту строку
+  getPerUserActivityStats,
   downloadActivityPdf
 };

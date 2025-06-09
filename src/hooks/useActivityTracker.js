@@ -76,7 +76,15 @@ export function useActivityTracker() {
       else if (event.type === 'key_press') grouped.keyPresses++
       else if (event.type === 'mouse_move') grouped.mouseMovements++
       else if (event.type === 'window_switch') {
-        const isAiTool = AI_SITES.includes(new URL(event.url).hostname)
+        let isAiTool = false
+
+        try {
+          const domain = event.url ? new URL(event.url).hostname : ''
+          isAiTool = AI_SITES.includes(domain)
+        } catch (e) {
+          console.warn('Invalid URL in window_switch event:', event.url)
+        }
+
         try {
           await axios.post('http://localhost:3000/api/activity', {
             type: 'window-switch',
