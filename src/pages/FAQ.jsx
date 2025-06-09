@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { FaChevronDown, FaChevronUp, FaQuestionCircle } from 'react-icons/fa'
 
 function FAQ() {
-  // FAQ items with question and answer
   const faqItems = [
     {
       question: 'What is REMS?',
@@ -45,73 +44,84 @@ function FAQ() {
       answer: 'Yes, we offer a 14-day free trial of all our premium features so you can test them before committing to a subscription. No credit card is required to start a trial.'
     }
   ]
-  
-  // State to track which FAQ items are expanded
-  const [expandedItems, setExpandedItems] = useState([0]) // Default first item expanded
-  
-  // Toggle expansion of an FAQ item
+
+  const [expandedItems, setExpandedItems] = useState([0])
+
   const toggleItem = (index) => {
-    setExpandedItems(prev => {
-      if (prev.includes(index)) {
-        return prev.filter(item => item !== index)
-      } else {
-        return [...prev, index]
-      }
-    })
+    setExpandedItems(prev =>
+      prev.includes(index)
+        ? prev.filter(item => item !== index)
+        : [...prev, index]
+    )
   }
-  
+
   return (
-    <div className="bg-white">
+    <div className="bg-white dark:bg-[#1D0036] transition-colors duration-300">
       {/* Header */}
-      <div className="bg-primary-600 text-white py-16">
+      <div className="bg-gradient-to-r from-primary-500 to-secondary-500 dark:from-[#3C1260] dark:to-[#4A3BA6] text-white py-16 shadow-md">
         <div className="container-custom text-center">
-          <h1 className="text-4xl font-bold mb-4">Frequently Asked Questions</h1>
+          <h1 className="text-5xl font-extrabold mb-4">Frequently Asked Questions</h1>
           <p className="text-xl max-w-3xl mx-auto">
             Find answers to common questions about REMS's features, pricing, and more.
           </p>
         </div>
       </div>
-      
+
       {/* FAQ List */}
       <section className="py-16">
         <div className="container-custom max-w-4xl">
           <div className="space-y-4">
-            {faqItems.map((item, index) => (
-              <div 
-                key={index} 
-                className="border border-gray-200 rounded-lg overflow-hidden"
-              >
-                <button
-                  className="flex justify-between items-center w-full p-4 text-left bg-white hover:bg-gray-50 focus:outline-none"
-                  onClick={() => toggleItem(index)}
+            {faqItems.map((item, index) => {
+              const isActive = expandedItems.includes(index)
+              return (
+                <div
+                  key={index}
+                  className={`border rounded-2xl overflow-hidden transition-all duration-300 shadow-sm
+                    ${isActive
+                      ? 'bg-primary-50 dark:bg-[#4B2B73] shadow-md border-primary-300 dark:border-[#6E4CA5]'
+                      : 'bg-white dark:bg-[#2D2040] border-gray-200 dark:border-[#39224C]'}`}
                 >
-                  <span className="font-medium text-lg text-gray-900">{item.question}</span>
-                  <span className="ml-6 flex-shrink-0 text-gray-500">
-                    {expandedItems.includes(index) ? <FaChevronUp /> : <FaChevronDown />}
-                  </span>
-                </button>
-                {expandedItems.includes(index) && (
-                  <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    <p className="text-gray-700">{item.answer}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+                  <button
+                    className="flex justify-between items-center w-full p-5 text-left hover:bg-gray-50 dark:hover:bg-[#39224C]/60 focus:outline-none transition-colors"
+                    onClick={() => toggleItem(index)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FaQuestionCircle className="text-primary-600 dark:text-[#C1B7FF]" />
+                      <span className="font-semibold text-lg text-gray-900 dark:text-white">
+                        {item.question}
+                      </span>
+                    </div>
+                    <span className="ml-6 flex-shrink-0 text-gray-500 dark:text-gray-300 transition-transform duration-300">
+                      {isActive ? <FaChevronUp /> : <FaChevronDown />}
+                    </span>
+                  </button>
+                  {isActive && (
+                    <div className="p-5 border-t border-gray-200 dark:border-[#39224C] bg-gray-50 dark:bg-[#3B2A4D] transition-all duration-300">
+                      <p className="text-gray-700 dark:text-gray-200 leading-relaxed">
+                        {item.answer}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
-      
+
       {/* Still have questions */}
-      <section className="py-12 bg-gray-50">
+      <section className="py-12 bg-gray-50 dark:bg-[#2D2040] transition-colors">
         <div className="container-custom max-w-3xl text-center">
-          <h2 className="text-2xl font-bold mb-4">Still have questions?</h2>
-          <p className="text-lg text-gray-600 mb-6">
+          <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+            Still have questions?
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
             Our support team is here to help you with any other questions you might have.
           </p>
           <div className="flex justify-center">
-            <a 
-              href="mailto: remshelper@gmail.com" 
-              className="btn-primary"
+            <a
+              href="mailto:remshelper@gmail.com"
+              className="btn bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl shadow-md transition"
             >
               Contact Support
             </a>

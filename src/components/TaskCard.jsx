@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useDrag } from 'react-dnd'
-import { FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle, FaClock, FaPlay, FaStop } from 'react-icons/fa'
+import {
+  FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle,
+  FaClock, FaPlay, FaStop
+} from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { useTasks } from '../context/TasksContext'
-import { formatDistanceToNow, formatDuration, intervalToDuration } from 'date-fns'
+import { formatDuration, intervalToDuration } from 'date-fns'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 
 function TaskCard({ task }) {
   const { currentUser } = useAuth()
@@ -27,21 +32,12 @@ function TaskCard({ task }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'task',
     item: { id: task.id },
-    canDrag: () => {
-      if (currentUser.role === 'worker') {
-        return task.assignedTo === currentUser.id
-      }
-      return true
-    },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
+    canDrag: () => currentUser.role !== 'worker' || task.assignedTo === currentUser.id,
+    collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
   }))
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      deleteTask(task.id)
-    }
+    if (window.confirm('Delete this task?')) deleteTask(task.id)
   }
 
   const handleSave = () => {
@@ -70,13 +66,14 @@ function TaskCard({ task }) {
   }
 
   const getPriorityBadge = () => {
+    const base = 'text-xs px-2 py-0.5 rounded-full font-medium'
     switch (task.priority) {
       case 'high':
-        return <span className="bg-error-100 text-error-800 text-xs px-2 py-1 rounded-full">High</span>
+        return <span className={`${base} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`}>High</span>
       case 'medium':
-        return <span className="bg-warning-100 text-warning-800 text-xs px-2 py-1 rounded-full">Medium</span>
+        return <span className={`${base} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`}>Medium</span>
       case 'low':
-        return <span className="bg-success-100 text-success-800 text-xs px-2 py-1 rounded-full">Low</span>
+        return <span className={`${base} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`}>Low</span>
       default:
         return null
     }
@@ -84,14 +81,12 @@ function TaskCard({ task }) {
 
   const getStatusIcon = () => {
     switch (task.status) {
-      case 'todo':
-        return null
       case 'inprogress':
-        return <FaExclamationCircle className="text-yellow-500" title="In progress" />
+        return <FaExclamationCircle className="text-yellow-500" title="In Progress" />
       case 'done':
         return <FaRegCheckCircle className="text-green-500" title="Completed" />
       case 'frozen':
-        return <span className="text-gray-500" title="Frozen">❄️</span>
+        return <span className="text-gray-400" title="Frozen">❄️</span>
       default:
         return null
     }
@@ -100,28 +95,34 @@ function TaskCard({ task }) {
   return (
     <div
       ref={drag}
-      className={`task-card ${isDragging ? 'opacity-50' : ''}`}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
+      className={`rounded-lg shadow-sm p-4 bg-white dark:bg-[#1F1F2C] border border-gray-200 dark:border-gray-700 transition
+        ${isDragging ? 'opacity-50' : ''}`}
     >
       {isEditing ? (
         <div className="space-y-3">
           <input
-            type="text"
-            className="form-input text-sm"
+            className="form-input w-full"
+            placeholder="Task title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Task title"
           />
-          <textarea
-            className="form-input text-sm"
+          <ReactQuill
+            theme="snow"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Task description"
-            rows={3}
-          ></textarea>
+            onChange={setDescription}
+            placeholder="Task description..."
+            modules={{
+              toolbar: [
+                [{ header: [1, 2, false] }],
+                ['bold', 'italic', 'underline'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['clean']
+              ],
+            }}
+          />
           <div className="flex justify-end space-x-2">
-            <button className="btn-outline text-sm py-1 px-2" onClick={() => setIsEditing(false)}>Cancel</button>
-            <button className="btn-primary text-sm py-1 px-2" onClick={handleSave}>Save</button>
+            <button className="btn-outline text-sm" onClick={() => setIsEditing(false)}>Cancel</button>
+            <button className="btn-primary text-sm" onClick={handleSave}>Save</button>
           </div>
         </div>
       ) : (
@@ -129,52 +130,47 @@ function TaskCard({ task }) {
           <div className="flex justify-between items-start mb-2">
             <div className="flex items-center space-x-2">
               {getStatusIcon()}
-              <h4 className="font-medium text-gray-900">{task.title}</h4>
+              <h4 className="font-semibold text-gray-800 dark:text-gray-100">{task.title}</h4>
             </div>
             {getPriorityBadge()}
           </div>
 
-          <p className="text-sm text-gray-600 mb-1">{task.description}</p>
+          <div
+            className="text-sm text-gray-600 dark:text-gray-300 mb-1"
+            dangerouslySetInnerHTML={{ __html: task.description }}
+          />
 
           {task.projectName && (
-            <div className="text-xs text-gray-500 italic mb-2">
+            <p className="text-xs italic text-gray-500 dark:text-gray-400 mb-2">
               Project: {task.projectName}
-            </div>
+            </p>
           )}
 
           {task.status === 'inprogress' && task.startTime && (
-            <div className="flex items-center text-sm text-gray-500 mb-3">
+            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
               <FaClock className="mr-1" />
               Time spent: {formatTime(elapsedTime)}
             </div>
           )}
 
           {task.status === 'todo' && (
-            <button
-              onClick={handleStartTask}
-              className="flex items-center text-sm text-primary-600 hover:text-primary-700 mb-3"
-            >
-              <FaPlay className="mr-1" />
-              Start Task
+            <button onClick={handleStartTask} className="text-primary-600 dark:text-primary-400 hover:underline text-sm mb-2 flex items-center">
+              <FaPlay className="mr-1" /> Start
             </button>
           )}
 
           {task.status === 'inprogress' && (
-            <button
-              onClick={handleStopTask}
-              className="flex items-center text-sm text-error-600 hover:text-error-700 mb-3"
-            >
-              <FaStop className="mr-1" />
-              Complete Task
+            <button onClick={handleStopTask} className="text-red-600 dark:text-red-400 hover:underline text-sm mb-2 flex items-center">
+              <FaStop className="mr-1" /> Complete
             </button>
           )}
 
           {(currentUser.role === 'admin' || currentUser.role === 'manager') && (
-            <div className="flex justify-end space-x-2 text-gray-500">
-              <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-primary-600" title="Edit task">
+            <div className="flex justify-end gap-3 text-gray-500 dark:text-gray-400 mt-2">
+              <button onClick={() => setIsEditing(true)} title="Edit task">
                 <FaEdit />
               </button>
-              <button onClick={handleDelete} className="text-gray-500 hover:text-error-600" title="Delete task">
+              <button onClick={handleDelete} title="Delete task">
                 <FaTrash />
               </button>
             </div>

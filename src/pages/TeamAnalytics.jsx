@@ -28,10 +28,12 @@ function TeamAnalytics() {
     averageCompletionTime: 0
   })
 
+  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+
   const downloadPdf = async () => {
     try {
       const token = localStorage.getItem('token')
-      const startDate = '2025-06-01'  // Можно сделать динамическим
+      const startDate = '2025-06-01'
       const endDate = '2025-06-07'
 
       const response = await axios.get('http://localhost:3000/api/activity/pdf', {
@@ -127,7 +129,7 @@ function TeamAnalytics() {
           taskCountsByRole.Manager,
           taskCountsByRole.Worker
         ],
-        backgroundColor: ['#3b82f6', '#f59e0b', '#10b981']
+        backgroundColor: isDark ? ['#BFA5FF', '#FFD479', '#60D394'] : ['#A5D8FF', '#FFD59E', '#D0BCFF']
       }
     ]
   }
@@ -148,7 +150,7 @@ function TeamAnalytics() {
             ? Math.round((completionRateByRole.Worker.done / completionRateByRole.Worker.total) * 100)
             : 0
         ],
-        backgroundColor: ['#3b82f6', '#f59e0b', '#10b981']
+        backgroundColor: isDark ? ['#BFA5FF', '#FFD479', '#60D394'] : ['#A5D8FF', '#FFD59E', '#D0BCFF']
       }
     ]
   }
@@ -156,10 +158,10 @@ function TeamAnalytics() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Team Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Team Analytics</h1>
         <button
           onClick={downloadPdf}
-          className="btn-outline flex items-center space-x-2 px-4 py-2 rounded border border-blue-500 text-blue-500 hover:bg-blue-50 transition"
+          className="btn-outline flex items-center space-x-2 px-4 py-2 rounded border border-primary-500 text-primary-500 hover:bg-primary-50 transition"
         >
           <FaFilePdf />
           <span>Download PDF</span>
@@ -167,15 +169,23 @@ function TeamAnalytics() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card bg-white p-6"><FaUsers /> Members: {teamMetrics.activeMembers}/{teamMetrics.totalMembers}</div>
-        <div className="card bg-white p-6"><FaTasks /> Total Tasks: {teamMetrics.totalTasks}</div>
-        <div className="card bg-white p-6"><FaCheckCircle /> Completed: {teamMetrics.completedTasks}</div>
-        <div className="card bg-white p-6"><FaClock /> Avg. Time: {Math.round(teamMetrics.averageCompletionTime / (1000 * 60 * 60))}h</div>
+        <div className="rounded-xl p-6 shadow-card bg-white text-gray-900 dark:bg-dark-500 dark:text-white">
+          <FaUsers className="inline-block mr-2" /> Members: {teamMetrics.activeMembers}/{teamMetrics.totalMembers}
+        </div>
+        <div className="rounded-xl p-6 shadow-card bg-white text-gray-900 dark:bg-dark-500 dark:text-white">
+          <FaTasks className="inline-block mr-2" /> Total Tasks: {teamMetrics.totalTasks}
+        </div>
+        <div className="rounded-xl p-6 shadow-card bg-white text-gray-900 dark:bg-dark-500 dark:text-white">
+          <FaCheckCircle className="inline-block mr-2" /> Completed: {teamMetrics.completedTasks}
+        </div>
+        <div className="rounded-xl p-6 shadow-card bg-white text-gray-900 dark:bg-dark-500 dark:text-white">
+          <FaClock className="inline-block mr-2" /> Avg. Time: {Math.round(teamMetrics.averageCompletionTime / (1000 * 60 * 60))}h
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
+        <div className="bg-white dark:bg-dark-500 p-6 rounded-xl shadow-card">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Task Distribution</h2>
           <Bar
             data={taskDistributionData}
             options={{
@@ -183,18 +193,15 @@ function TeamAnalytics() {
               scales: {
                 y: {
                   beginAtZero: true,
-                  ticks: {
-                    stepSize: 1,
-                    precision: 0
-                  }
+                  ticks: { stepSize: 1, precision: 0 }
                 }
               }
             }}
           />
         </div>
 
-        <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Completion Rate</h2>
+        <div className="bg-white dark:bg-dark-500 p-6 rounded-xl shadow-card">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Completion Rate</h2>
           <Bar
             data={completionRateData}
             options={{

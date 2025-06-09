@@ -1,3 +1,4 @@
+// ProjectAnalytics.jsx
 import { useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
@@ -24,6 +25,8 @@ function ProjectAnalytics() {
   const [tasks, setTasks] = useState([]);
   const [selectedProject, setSelectedProject] = useState('all');
 
+  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -44,7 +47,7 @@ function ProjectAnalytics() {
         setProjects(projectData);
         setTasks(taskData);
       } catch (err) {
-        console.error('❌ Error loading analytics data:', err);
+        console.error('Error loading analytics data:', err);
       }
     };
 
@@ -82,8 +85,8 @@ function ProjectAnalytics() {
               const completed = filtered.filter(t => t.status === 'done').length;
               return [total > 0 ? Math.round((completed / total) * 100) : 0];
             })(),
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        borderColor: 'rgb(59, 130, 246)'
+        backgroundColor: isDark ? 'rgba(147,112,219,0.6)' : 'rgba(99,102,241,0.5)',
+        borderColor: isDark ? 'rgb(186,85,211)' : 'rgb(99,102,241)'
       }
     ]
   };
@@ -98,18 +101,13 @@ function ProjectAnalytics() {
           taskStatusCounts.done,
           taskStatusCounts.frozen
         ],
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.5)',
-          'rgba(245, 158, 11, 0.5)',
-          'rgba(34, 197, 94, 0.5)',
-          'rgba(107, 114, 128, 0.5)'
-        ],
-        borderColor: [
-          'rgb(59, 130, 246)',
-          'rgb(245, 158, 11)',
-          'rgb(34, 197, 94)',
-          'rgb(107, 114, 128)'
-        ]
+        backgroundColor: isDark
+          ? ['#C6DBFF', '#FFE7B3', '#CFF9E2', '#CED3E0']
+          : ['#93C5FD', '#FDE047', '#86EFAC', '#CBD5E1'],
+        borderColor: isDark
+          ? ['#8FA2CC', '#D3B16E', '#7CCFA9', '#9AA5B3']
+          : ['#3B82F6', '#EAB308', '#10B981', '#64748B'],
+        borderWidth: 1
       }
     ]
   };
@@ -117,11 +115,11 @@ function ProjectAnalytics() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Project Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Project Analytics</h1>
         <select
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
-          className="form-input py-1"
+          className="form-select py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-500 text-gray-800 dark:text-white"
         >
           <option value="all">All Projects</option>
           {projects.map(p => (
@@ -131,34 +129,34 @@ function ProjectAnalytics() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card bg-white p-6">
-          <FaProjectDiagram className="text-blue-600 mb-2" />
-          <p className="text-sm font-medium text-gray-600">Total Projects</p>
-          <p className="text-2xl font-semibold text-gray-900">{projects.length}</p>
+        <div className="p-6 rounded-2xl shadow-card bg-white dark:bg-dark-500 text-gray-900 dark:text-white">
+          <FaProjectDiagram className="text-indigo-500 mb-2" />
+          <p className="text-sm font-medium">Total Projects</p>
+          <p className="text-2xl font-semibold">{projects.length}</p>
         </div>
 
-        <div className="card bg-white p-6">
-          <FaTasks className="text-yellow-600 mb-2" />
-          <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-          <p className="text-2xl font-semibold text-gray-900">{filteredTasks.length}</p>
+        <div className="p-6 rounded-2xl shadow-card bg-white dark:bg-dark-500 text-gray-900 dark:text-white">
+          <FaTasks className="text-yellow-500 mb-2" />
+          <p className="text-sm font-medium">Total Tasks</p>
+          <p className="text-2xl font-semibold">{filteredTasks.length}</p>
         </div>
 
-        <div className="card bg-white p-6">
-          <FaCheckCircle className="text-green-600 mb-2" />
-          <p className="text-sm font-medium text-gray-600">Completed Tasks</p>
-          <p className="text-2xl font-semibold text-gray-900">{taskStatusCounts.done}</p>
+        <div className="p-6 rounded-2xl shadow-card bg-white dark:bg-dark-500 text-gray-900 dark:text-white">
+          <FaCheckCircle className="text-emerald-500 mb-2" />
+          <p className="text-sm font-medium">Completed Tasks</p>
+          <p className="text-2xl font-semibold">{taskStatusCounts.done}</p>
         </div>
 
-        <div className="card bg-white p-6">
-          <FaClock className="text-purple-600 mb-2" />
-          <p className="text-sm font-medium text-gray-600">Frozen Tasks</p>
-          <p className="text-2xl font-semibold text-gray-900">{taskStatusCounts.frozen}</p>
+        <div className="p-6 rounded-2xl shadow-card bg-white dark:bg-dark-500 text-gray-900 dark:text-white">
+          <FaClock className="text-slate-500 mb-2" />
+          <p className="text-sm font-medium">Frozen Tasks</p>
+          <p className="text-2xl font-semibold">{taskStatusCounts.frozen}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Project Progress</h2>
+        <div className="bg-white dark:bg-dark-500 p-6 rounded-2xl shadow-card">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Project Progress</h2>
           <Bar
             data={progressData}
             options={{
@@ -176,13 +174,21 @@ function ProjectAnalytics() {
           />
         </div>
 
-        <div className="card bg-white p-6">
-          <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
+        <div className="bg-white dark:bg-dark-500 p-6 rounded-2xl shadow-card">
+          <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Task Distribution</h2>
           <Doughnut
             data={taskDistributionData}
             options={{
               responsive: true,
-              plugins: { legend: { position: 'top' } }
+              plugins: {
+                legend: {
+                  position: 'top',
+                  labels: {
+                    color: isDark ? '#ffffff' : '#1f2937',
+                    font: { size: 14, weight: '500' }
+                  }
+                }
+              }
             }}
           />
         </div>

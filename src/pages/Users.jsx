@@ -77,9 +77,9 @@ function Users() {
     const hrs = Math.floor(mins / 60)
     const days = Math.floor(hrs / 24)
     return mins < 1 ? 'just now'
-         : mins < 60 ? `${mins} minute${mins === 1 ? '' : 's'} ago`
-         : hrs < 24 ? `${hrs} hour${hrs === 1 ? '' : 's'} ago`
-         : `${days} day${days === 1 ? '' : 's'} ago`
+      : mins < 60 ? `${mins} min${mins === 1 ? '' : 's'} ago`
+      : hrs < 24 ? `${hrs} hr${hrs === 1 ? '' : 's'} ago`
+      : `${days} day${days === 1 ? '' : 's'} ago`
   }
 
   const toggleSortKey = (key) => {
@@ -110,14 +110,14 @@ function Users() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
         <button className="btn-primary flex items-center" onClick={() => setIsAddingUser(true)}>
           <FaUserPlus className="mr-2" /> Add User
         </button>
       </div>
 
       {isAddingUser && (
-        <div className="card bg-white p-4 space-y-4">
+        <div className="card bg-white dark:bg-[#2D2040] p-4 space-y-4 rounded-lg shadow-md">
           <input
             type="text"
             placeholder="Name"
@@ -165,43 +165,43 @@ function Users() {
         <button className={`btn-outline ${isActiveSort('status') ? 'bg-blue-100 border-blue-500 text-blue-800' : ''}`} onClick={() => toggleSortKey('status')}>Sort by Status</button>
       </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-[#2D2040] shadow-md rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-[#3A2A50]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Active</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PDF</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Last Active</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">PDF</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-[#2D2040] divide-y divide-gray-200 dark:divide-gray-700">
             {sortedUsers.map(user => (
               <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap text-gray-800 dark:text-white">
                   <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500 font-medium">{user.name[0]}</span>
+                    <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                      <span className="text-gray-600 dark:text-white font-medium">{user.name[0]}</span>
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                    user.role === 'manager' ? 'bg-blue-100 text-blue-800' :
-                    'bg-green-100 text-green-800'
+                    user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
+                    user.role === 'manager' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                   }`}>{user.role}</span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatTimeAgo(user.last_active)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{formatTimeAgo(user.last_active)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`flex items-center ${user.is_logged_in ? 'text-green-500' : 'text-red-500'}`}>
-                    {user.is_logged_in ? <FaCheck className="mr-1.5 h-2 w-2" /> : <FaTimes className="mr-1.5 h-2 w-2" />} 
+                    {user.is_logged_in ? <FaCheck className="mr-1.5 h-3 w-3" /> : <FaTimes className="mr-1.5 h-3 w-3" />}
                     {user.is_logged_in ? 'online' : 'offline'}
                   </span>
                 </td>
