@@ -2,6 +2,7 @@ const { ApiError } = require('../middleware/errorHandler');
 const { logger } = require('../utils/logger');
 const { hashPassword, comparePassword } = require('../utils/passwordUtils');
 const db = require('../config/database');
+const sendEmail = require('../utils/sendEmail')
 
 // Get current user info
 const getCurrentUser = async (req, res, next) => {
@@ -125,7 +126,55 @@ const getUsersWithActivity = async (req, res, next) => {
   }
 };
 
+const createUser = async (req, res, next) => {
+  try {
+    const { name, email, role } = req.body;
 
+    if (!name || !email || !role) {
+      throw new ApiError(400, 'All fields are required');
+    }
+
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      throw new ApiError(400, 'User with this email already exists');
+    }
+
+    // 🛡 Генерация временного пароля
+    const plainPassword = crypto.randomBytes(6).toString('hex'); // напр. "a1b2c3d4e5f6"
+    const hashedPassword = await hashPassword(plainPassword);
+    const id = uuidv4();
+
+    const result = await db.query(
+      `INSERT INTO users (id, name, email, role, password_hash, must_change_password)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, email, role`,
+      [id, name, email, role, hashedPassword, true]
+    );
+
+    // ✉ Отправка email
+    await sendEmail(
+      email,
+      '🔐 Your REMS Account Access',
+      `
+        <h2>Hello, ${name}!</h2>
+        <p>You've been invited to the <strong>REMS</strong> platform as a <strong>${role}</strong>.</p>
+        <p>Here are your temporary credentials:</p>
+        <ul>
+          <li><strong>Login:</strong> ${email}</li>
+          <li><strong>Password:</strong> ${plainPassword}</li>
+        </ul>
+        <p>👉 Access the platform here: <a href="http://localhost:5173">http://localhost:5173</a></p>
+        <p style="color: red;"><strong>Please change your password after logging in.</strong></p>
+        <br />
+        <p>— REMS Team</p>
+      `
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+};
 
 
 
@@ -135,5 +184,6 @@ module.exports = {
   updateCurrentUser,
   getAllUsers,
   updateAvatar,
-  getUsersWithActivity
+  getUsersWithActivity,
+  createUser
 };

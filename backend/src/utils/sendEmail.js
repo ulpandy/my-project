@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const { logger } = require('./logger');
 
-const sendEmail = async (to, subject, text) => {
+const sendEmail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -15,7 +15,7 @@ const sendEmail = async (to, subject, text) => {
       from: `"Support" <${process.env.EMAIL_USER}>`,
       to,
       subject,
-      text,
+      html,
     });
 
     logger.info(`📧 Email sent to ${to} - Message ID: ${info.messageId}`);
