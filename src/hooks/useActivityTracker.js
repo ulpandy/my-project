@@ -44,19 +44,24 @@ export function useActivityTracker() {
 
   function detectWindow() {
     try {
-      const activeUrl = document.hasFocus() ? window.location.href : null
-      const domain = activeUrl ? new URL(activeUrl).hostname : 'none'
+      if (!document.hasFocus()) return;
+  
+      const activeUrl = window.location.href;
+      const domain = new URL(activeUrl).hostname;
+  
       if (domain && domain !== lastWindow.current) {
-        lastWindow.current = domain
+        lastWindow.current = domain;
+  
         bufferEvent('window_switch', {
-          title: document.title,
+          title: document.title || 'Untitled',
           url: activeUrl
-        })
+        });
       }
     } catch (e) {
-      console.warn('Window switch detection error:', e)
+      console.warn('Window switch detection error:', e);
     }
   }
+  
 
   async function sendBufferedEvents() {
     const token = localStorage.getItem('token')
