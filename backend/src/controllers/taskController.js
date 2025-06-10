@@ -16,7 +16,7 @@ const getTasks = async (req, res, next) => {
         t.assigned_to as "assignedTo", t.created_by as "createdBy",
         t.project_id as "projectId",
         t.created_at as "createdAt", t.updated_at as "updatedAt",
-        t.end_time as "endTime", t.time_spent as "timeSpent", -- ✅ добавлено
+        t.start_time as "startTime", t.end_time as "endTime", t.time_spent as "timeSpent",
         u1.name as "assignedToName", u2.name as "createdByName",
         p.name as "projectName"
       FROM tasks t
@@ -30,27 +30,23 @@ const getTasks = async (req, res, next) => {
     let paramIndex = 1;
 
     if (status) {
-      query += ` AND t.status = $${paramIndex}`;
+      query += ` AND t.status = $${paramIndex++}`;
       queryParams.push(status);
-      paramIndex++;
     }
 
     if (assignedTo) {
-      query += ` AND t.assigned_to = $${paramIndex}`;
+      query += ` AND t.assigned_to = $${paramIndex++}`;
       queryParams.push(assignedTo);
-      paramIndex++;
     }
 
     if (projectId) {
-      query += ` AND t.project_id = $${paramIndex}`;
+      query += ` AND t.project_id = $${paramIndex++}`;
       queryParams.push(projectId);
-      paramIndex++;
     }
 
     if (userRole === 'worker') {
-      query += ` AND t.assigned_to = $${paramIndex}`;
+      query += ` AND t.assigned_to = $${paramIndex++}`;
       queryParams.push(userId);
-      paramIndex++;
     }
 
     query += ' ORDER BY t.created_at DESC';
@@ -62,7 +58,7 @@ const getTasks = async (req, res, next) => {
   }
 };
 
-// Создание новой задачи
+// Создание задачи
 const createTask = async (req, res, next) => {
   try {
     const { title, description, assignedTo, priority, projectId } = req.body;
@@ -89,6 +85,7 @@ const createTask = async (req, res, next) => {
   }
 };
 
+// Обновление задачи
 const updateTask = async (req, res, next) => {
   try {
     const taskId = req.params.id;
@@ -99,8 +96,9 @@ const updateTask = async (req, res, next) => {
       assignedTo,
       priority,
       projectId,
-      timeSpent,
-      startTime // 🆕 разрешаем клиенту явно передать
+      startTime,
+      endTime,
+      timeSpent
     } = req.body;
 
     const userId = req.user.id;
@@ -122,58 +120,66 @@ const updateTask = async (req, res, next) => {
     const values = [];
     let paramIndex = 1;
 
-    // 🟦 Добавляем поля
-    if (title !== undefined) {
-      updates.push(`title = COALESCE($${paramIndex++}, title)`);
+    if ('title' in req.body) {
+      updates.push(`title = $${paramIndex++}`);
       values.push(title);
     }
 
-    if (description !== undefined) {
-      updates.push(`description = COALESCE($${paramIndex++}, description)`);
+    if ('description' in req.body) {
+      updates.push(`description = $${paramIndex++}`);
       values.push(description);
     }
 
-    if (status !== undefined) {
-      updates.push(`status = COALESCE($${paramIndex++}, status)`);
+    if ('status' in req.body) {
+      updates.push(`status = $${paramIndex++}`);
       values.push(status);
     }
 
-    if (assignedTo !== undefined) {
-      updates.push(`assigned_to = COALESCE($${paramIndex++}, assigned_to)`);
+    if ('assignedTo' in req.body) {
+      updates.push(`assigned_to = $${paramIndex++}`);
       values.push(assignedTo);
     }
 
-    if (priority !== undefined) {
-      updates.push(`priority = COALESCE($${paramIndex++}, priority)`);
+    if ('priority' in req.body) {
+      updates.push(`priority = $${paramIndex++}`);
       values.push(priority);
     }
 
-    if (projectId !== undefined) {
-      updates.push(`project_id = COALESCE($${paramIndex++}, project_id)`);
+    if ('projectId' in req.body) {
+      updates.push(`project_id = $${paramIndex++}`);
       values.push(projectId);
     }
 
-    // 🟨 Установка start_time при первом переходе в inprogress
-    if (status === 'inprogress' && !task.start_time) {
+    if ('startTime' in req.body) {
+      updates.push(`start_time = $${paramIndex++}`);
+      values.push(startTime === null ? null : new Date(startTime));
+    }
+
+    if ('endTime' in req.body) {
+      updates.push(`end_time = $${paramIndex++}`);
+      values.push(endTime === null ? null : new Date(endTime));
+    }
+
+    if ('timeSpent' in req.body) {
+      updates.push(`time_spent = $${paramIndex++}`);
+      values.push(timeSpent === null ? null : timeSpent);
+    }
+
+    // Автоматически назначаем start_time, если статус inprogress и start_time ещё не установлен
+    if (status === 'inprogress' && !task.start_time && !('startTime' in req.body)) {
       updates.push(`start_time = NOW()`);
     }
 
-    // 🟥 Установка end_time и time_spent, если задача завершается
-    if (status === 'done' && !task.end_time) {
+    // Автоматически устанавливаем end_time и time_spent при завершении задачи
+    if (status === 'done' && !task.end_time && !('endTime' in req.body)) {
       updates.push(`end_time = NOW()`);
-
-      if (timeSpent) {
-        updates.push(`time_spent = $${paramIndex++}`);
-        values.push(timeSpent);
-      } else if (task.start_time) {
+      if (!('timeSpent' in req.body) && task.start_time) {
         updates.push(`time_spent = EXTRACT(EPOCH FROM (NOW() - start_time)) * 1000`);
       }
     }
 
-    // 🟦 Обновляем updated_at
     updates.push(`updated_at = NOW()`);
 
-    // Собираем итоговый запрос
     const query = `
       UPDATE tasks
       SET ${updates.join(', ')}
@@ -185,8 +191,7 @@ const updateTask = async (req, res, next) => {
         start_time as "startTime", end_time as "endTime", time_spent as "timeSpent"
     `;
 
-    values.push(taskId); // последний параметр — ID задачи
-
+    values.push(taskId);
     const result = await db.query(query, values);
 
     logger.info(`Task updated: ${taskId}`);
@@ -195,10 +200,6 @@ const updateTask = async (req, res, next) => {
     next(error);
   }
 };
-
-
-
-
 
 // Удаление задачи
 const deleteTask = async (req, res, next) => {
@@ -218,7 +219,7 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
-// 📊 Завершённые задачи по дням недели
+// Завершенные задачи по дням недели
 const getWeeklyTaskCompletion = async (req, res, next) => {
   try {
     const userId = req.user.id;

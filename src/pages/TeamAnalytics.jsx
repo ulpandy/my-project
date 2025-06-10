@@ -14,6 +14,7 @@ import { FaUsers, FaTasks, FaCheckCircle, FaClock, FaFilePdf } from 'react-icons
 import { useTasks } from '../context/TasksContext'
 import axios from 'axios'
 import { saveAs } from 'file-saver'
+import { intervalToDuration, formatDuration } from 'date-fns'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement)
 
@@ -33,34 +34,30 @@ function TeamAnalytics() {
   const downloadPdf = async () => {
     try {
       const token = localStorage.getItem('token')
-  
       if (!token) {
         alert('Authorization token not found')
         return
       }
-  
-      // Диапазон: последние 7 дней
+
       const now = new Date()
-      const endDateObj = new Date(now)
-      const startDateObj = new Date(now)
-      startDateObj.setDate(endDateObj.getDate() - 7)
-  
-      // Добавим +1 день к endDate, чтобы включить события до конца дня
-      endDateObj.setDate(endDateObj.getDate() + 1)
-  
+      const startDate = new Date(now)
+      const endDate = new Date(now)
+      startDate.setDate(startDate.getDate() - 7)
+      endDate.setDate(endDate.getDate() + 1)
+
       const formatDate = (date) => date.toISOString().split('T')[0]
-  
+
       const response = await axios.get('http://localhost:3000/api/activity/pdf', {
         params: {
-          startDate: formatDate(startDateObj),
-          endDate: formatDate(endDateObj)
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate)
         },
         headers: {
           Authorization: `Bearer ${token}`
         },
         responseType: 'blob'
       })
-  
+
       const pdfBlob = new Blob([response.data], { type: 'application/pdf' })
       saveAs(pdfBlob, 'activity-report.pdf')
     } catch (error) {
@@ -68,7 +65,6 @@ function TeamAnalytics() {
       alert('PDF download failed')
     }
   }
-  
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -81,7 +77,7 @@ function TeamAnalytics() {
         if (!res.ok) throw new Error('Failed to fetch users')
         const users = await res.json()
 
-        const active = users.filter(u => u.is_active).length
+        const active = users.filter(u => u.tasks && u.tasks.length > 0).length
 
         const rolesMap = {}
         users.forEach(user => {
@@ -104,9 +100,14 @@ function TeamAnalytics() {
 
   useEffect(() => {
     const completed = filteredTasks.filter(task => task.status === 'done')
+
     const totalTime = completed.reduce((acc, task) => {
       if (task.startTime && task.endTime) {
-        return acc + (new Date(task.endTime) - new Date(task.startTime))
+        const start = new Date(task.startTime)
+        const end = new Date(task.endTime)
+        if (!isNaN(start) && !isNaN(end)) {
+          return acc + (end - start)
+        }
       }
       return acc
     }, 0)
@@ -159,20 +160,19 @@ function TeamAnalytics() {
     datasets: [
       {
         label: 'Completion Rate (%)',
-        data: [
-          completionRateByRole.Admin.total
-            ? Math.round((completionRateByRole.Admin.done / completionRateByRole.Admin.total) * 100)
-            : 0,
-          completionRateByRole.Manager.total
-            ? Math.round((completionRateByRole.Manager.done / completionRateByRole.Manager.total) * 100)
-            : 0,
-          completionRateByRole.Worker.total
-            ? Math.round((completionRateByRole.Worker.done / completionRateByRole.Worker.total) * 100)
-            : 0
-        ],
+        data: ['Admin', 'Manager', 'Worker'].map(role => {
+          const { total, done } = completionRateByRole[role]
+          return total ? Math.round((done / total) * 100) : 0
+        }),
         backgroundColor: isDark ? ['#BFA5FF', '#FFD479', '#60D394'] : ['#A5D8FF', '#FFD59E', '#D0BCFF']
       }
     ]
+  }
+
+  const formatAvgTime = (ms) => {
+    if (ms === 0) return '0 min'
+    const duration = intervalToDuration({ start: 0, end: ms })
+    return formatDuration(duration, { format: ['hours', 'minutes'] })
   }
 
   return (
@@ -199,7 +199,7 @@ function TeamAnalytics() {
           <FaCheckCircle className="inline-block mr-2" /> Completed: {teamMetrics.completedTasks}
         </div>
         <div className="rounded-xl p-6 shadow-card bg-white text-gray-900 dark:bg-dark-500 dark:text-white">
-          <FaClock className="inline-block mr-2" /> Avg. Time: {Math.round(teamMetrics.averageCompletionTime / (1000 * 60 * 60))}h
+          <FaClock className="inline-block mr-2" /> Avg. Time: {formatAvgTime(teamMetrics.averageCompletionTime)}
         </div>
       </div>
 

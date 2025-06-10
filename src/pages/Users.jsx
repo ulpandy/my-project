@@ -62,35 +62,42 @@ function Users() {
 };
 
 
-  const downloadUserPdf = async (userId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await axios.get('http://localhost:3000/api/activity/pdf', {
-        params: { userId, startDate: '2025-06-01', endDate: '2025-06-07' },
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      })
-      const pdfBlob = new Blob([res.data], { type: 'application/pdf' })
-      saveAs(pdfBlob, `activity-${userId}.pdf`)
-    } catch (error) {
-      console.error('Download error:', error)
-      alert('Failed to download user activity PDF')
-    }
-  }
-
-  const handleDeleteUser = async (userId) => {
-  const confirmDelete = window.confirm('Are you sure you want to delete this user?')
-  if (!confirmDelete) return
-
+const downloadUserPdf = async () => {
   try {
     const token = localStorage.getItem('token')
-    await axios.delete(`http://localhost:3000/api/users/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+
+    if (!token) {
+      alert('Authorization token not found')
+      return
+    }
+
+    // Диапазон: последние 7 дней
+    const now = new Date()
+    const endDateObj = new Date(now)
+    const startDateObj = new Date(now)
+    startDateObj.setDate(endDateObj.getDate() - 7)
+
+    // Добавим +1 день к endDate, чтобы включить события до конца дня
+    endDateObj.setDate(endDateObj.getDate() + 1)
+
+    const formatDate = (date) => date.toISOString().split('T')[0]
+
+    const response = await axios.get('http://localhost:3000/api/activity/pdf', {
+      params: {
+        startDate: formatDate(startDateObj),
+        endDate: formatDate(endDateObj)
+      },
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      responseType: 'blob'
     })
-    setUsers(prev => prev.filter(user => user.id !== userId))
-  } catch (err) {
-    console.error('Failed to delete user:', err)
-    alert('Failed to delete user')
+
+    const pdfBlob = new Blob([response.data], { type: 'application/pdf' })
+    saveAs(pdfBlob, 'activity-report.pdf')
+  } catch (error) {
+    console.error('Failed to download PDF:', error)
+    alert('PDF download failed')
   }
 }
 

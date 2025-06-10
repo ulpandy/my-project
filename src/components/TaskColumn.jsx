@@ -7,26 +7,35 @@ function TaskColumn({ status, title, tasks }) {
   const { updateTask } = useTasks()
   const { currentUser } = useAuth()
 
-  // Set up drop target
-   const [{ isOver }, drop] = useDrop(() => ({
-    accept: 'task',
-    drop: (item) => {
-     handleDrop(item.id)
-   },
-  // Удалена проверка assignedTo
-    canDrop: () => true,
-    collect: (monitor) => ({
-     isOver: !!monitor.isOver(),
-     canDrop: !!monitor.canDrop(),
-  }),
-}))
-
-
   const handleDrop = (taskId) => {
-    updateTask(taskId, { status })
+    const updates = { status }
+
+    if (status === 'todo') {
+      updates.startTime = null
+      updates.endTime = null
+      updates.timeSpent = null
+    }
+
+    if (status === 'inprogress') {
+      updates.endTime = null
+      updates.timeSpent = null
+    }
+
+    updateTask(taskId, updates)
   }
 
-  // Get status color
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: 'task',
+    drop: (item) => {
+      handleDrop(item.id)
+    },
+    canDrop: () => true,
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+      canDrop: !!monitor.canDrop(),
+    }),
+  }))
+
   const getStatusColor = () => {
     switch (status) {
       case 'todo':
@@ -43,7 +52,7 @@ function TaskColumn({ status, title, tasks }) {
   }
 
   return (
-    <div 
+    <div
       ref={drop}
       className={`task-column ${getStatusColor()} border-t-4 ${isOver ? 'ring-2 ring-primary-500' : ''} rounded-md p-2`}
     >

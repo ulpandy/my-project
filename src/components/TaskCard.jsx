@@ -4,19 +4,21 @@ import {
   FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle,
   FaClock, FaPlay, FaStop, FaPause
 } from 'react-icons/fa'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext'  // ✅ этот импорт обязателен
 import { useTasks } from '../context/TasksContext'
 import { formatDuration, intervalToDuration } from 'date-fns'
 import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 
+
 function TaskCard({ task }) {
   const { currentUser } = useAuth()
   const { deleteTask, updateTask } = useTasks()
+
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description)
-  const [elapsedTime, setElapsedTime] = useState(task.timeSpent || 0)
+  const [elapsedTime, setElapsedTime] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [pauseStartTime, setPauseStartTime] = useState(null)
   const [totalPausedTime, setTotalPausedTime] = useState(0)
@@ -25,10 +27,10 @@ function TaskCard({ task }) {
     let interval
     if (task.status === 'inprogress' && task.startTime && !isPaused) {
       interval = setInterval(() => {
-        const baseTime = new Date(task.startTime).getTime()
         const now = Date.now()
-        const elapsed = now - baseTime - totalPausedTime
-        setElapsedTime(elapsed)
+        const start = new Date(task.startTime).getTime()
+        const activeTime = now - start - totalPausedTime
+        setElapsedTime(activeTime)
       }, 1000)
     }
     return () => clearInterval(interval)
@@ -51,8 +53,12 @@ function TaskCard({ task }) {
   }
 
   const handleStartTask = () => {
+    const now = new Date().toISOString()
     updateTask(task.id, {
-      status: 'inprogress' // ⛔ Без startTime — backend сам ставит NOW()
+      status: 'inprogress',
+      startTime: now,
+      endTime: null,
+      timeSpent: null
     })
   }
 
@@ -60,8 +66,8 @@ function TaskCard({ task }) {
     if (!isPaused) {
       setPauseStartTime(Date.now())
     } else {
-      const pauseEndTime = Date.now()
-      const pauseDuration = pauseEndTime - pauseStartTime
+      const pauseEnd = Date.now()
+      const pauseDuration = pauseEnd - pauseStartTime
       setTotalPausedTime(prev => prev + pauseDuration)
       setPauseStartTime(null)
     }
@@ -69,11 +75,22 @@ function TaskCard({ task }) {
   }
 
   const handleStopTask = () => {
-    const finalElapsedTime = elapsedTime
+    if (!task.startTime) {
+      alert('Cannot complete task: start time is missing.')
+      return
+    }
+
+    const now = new Date()
+    const start = new Date(task.startTime)
+    const rawTime = now.getTime() - start.getTime() - totalPausedTime
+    const timeSpent = Math.max(rawTime, 1000)
+
     updateTask(task.id, {
       status: 'done',
-      timeSpent: finalElapsedTime // ⏱️ отправляем только длительность
+      endTime: now.toISOString(),
+      timeSpent
     })
+
     setIsPaused(false)
     setTotalPausedTime(0)
   }
@@ -109,6 +126,19 @@ function TaskCard({ task }) {
         return <span className="text-gray-400" title="Frozen">❄️</span>
       default:
         return null
+    }
+  }
+
+  const getFormattedTimeSpent = () => {
+    if (typeof task.timeSpent === 'number') {
+      return formatTime(task.timeSpent)
+    } else if (task.startTime && task.endTime) {
+      const start = new Date(task.startTime)
+      const end = new Date(task.endTime)
+      const fallbackTime = Math.max(end - start, 1000)
+      return formatTime(fallbackTime)
+    } else {
+      return 'Not tracked'
     }
   }
 
@@ -178,7 +208,7 @@ function TaskCard({ task }) {
             </div>
           )}
 
-          {(task.status === 'inprogress' && task.startTime) && (
+          {task.status === 'inprogress' && task.startTime && (
             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
               <FaClock className="mr-1" />
               Time spent: {formatTime(elapsedTime)}
@@ -186,10 +216,11 @@ function TaskCard({ task }) {
             </div>
           )}
 
-          {(task.status === 'done' && task.timeSpent > 0) && (
+          {task.status === 'done' && (
             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
               <FaClock className="mr-1" />
-              <span className="font-medium">Time spent:</span>&nbsp;{formatTime(task.timeSpent)}
+              <span className="font-medium">Time spent:</span>&nbsp;
+              {getFormattedTimeSpent()}
             </div>
           )}
 

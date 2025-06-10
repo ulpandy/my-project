@@ -64,8 +64,13 @@ function WorkerAnalytics() {
 
   const parseDate = (value) => {
     if (!value) return null
-    return typeof value === 'string' ? new Date(value + 'Z') : new Date(value)
+    try {
+      return new Date(value)
+    } catch {
+      return null
+    }
   }
+  
 
   useEffect(() => {
     const workerTasks = tasks.filter(t => t.assignedTo === currentUser.id)
@@ -82,50 +87,86 @@ function WorkerAnalytics() {
 
   const getDateRange = () => {
     const now = new Date()
+    const utcNow = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds()
+    ))
+  
     switch (dateRange) {
       case 'day':
         return {
-          start: new Date(now.setHours(0, 0, 0, 0)),
-          end: new Date(now.setHours(23, 59, 59, 999))
+          start: new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate(), 0, 0, 0)),
+          end: new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate(), 23, 59, 59, 999))
         }
       case 'month':
-        return { start: startOfMonth(now), end: endOfMonth(now) }
+        return {
+          start: startOfMonth(utcNow),
+          end: endOfMonth(utcNow)
+        }
       case 'week':
       default:
-        return { start: startOfWeek(now), end: endOfWeek(now) }
+        return {
+          start: startOfWeek(utcNow, { weekStartsOn: 0 }), // воскресенье как начало недели
+          end: endOfWeek(utcNow, { weekStartsOn: 0 })
+        }
     }
   }
+  
 
   useEffect(() => {
     const fetchWorkedHours = async () => {
       try {
         const { start, end } = getDateRange()
-        const res = await fetch(`/api/activity/worked-hours?startDate=${start.toISOString()}&endDate=${end.toISOString()}`)
+        
+        const token = localStorage.getItem('token') // или sessionStorage / из context'а, если ты хранишь иначе
+        if (!token) {
+          console.error('Нет токена авторизации')
+          return
+        }
+    
+        const res = await fetch(`/api/activity/worked-hours?startDate=${start.toISOString()}&endDate=${end.toISOString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+    
+        if (!res.ok) {
+          throw new Error(`Ошибка ${res.status}: ${res.statusText}`)
+        }
+    
         const data = await res.json()
         setTimeStats(data)
       } catch (err) {
         console.error('Failed to fetch worked hours', err)
       }
     }
-
+    
     fetchWorkedHours()
   }, [dateRange])
 
   useEffect(() => {
     const { start, end } = getDateRange()
-    const values = Array(7).fill(0)
-
+    console.log('Start of week:', start.toISOString())
+    console.log('End of week:', end.toISOString())
+  
     tasks.forEach(task => {
-      if (task.assignedTo !== currentUser.id || task.status !== 'done' || !task.endTime || !task.timeSpent) return
       const endDate = parseDate(task.endTime)
-      if (isValid(endDate) && isWithinInterval(endDate, { start, end })) {
-        const day = endDate.getDay()
-        values[day] += task.timeSpent / 3600000 // в часах
+      if (task.assignedTo === currentUser.id && task.status === 'done') {
+        console.log({
+          taskTitle: task.title,
+          endTime: task.endTime,
+          parsed: isValid(endDate) ? endDate.toISOString() : 'Invalid Date',
+          inRange: isValid(endDate) && isWithinInterval(endDate, { start, end }),
+          day: isValid(endDate) ? endDate.getDay() : 'Invalid'
+        })
       }
     })
-
-    setTaskTimeStats(values)
   }, [tasks, dateRange, currentUser.id])
+  
 
   const completionData = useMemo(() => {
     const { start, end } = getDateRange()
