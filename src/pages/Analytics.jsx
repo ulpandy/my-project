@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement, 
-  Title, 
-  Tooltip, 
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
   Legend,
   ArcElement,
   PointElement,
@@ -16,7 +16,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import { FaLayerGroup, FaCheck, FaBolt, FaClock } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { useTasks } from '../context/TasksContext'
-import { format, startOfWeek, eachDayOfInterval, addDays, isValid } from 'date-fns'
+import { isValid, isSameDay, isWithinInterval, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 
 ChartJS.register(
   CategoryScale,
@@ -43,11 +43,8 @@ function WorkerAnalytics() {
   })
 
   const tasks = getFilteredTasks()
-  const startOfCurrentWeek = startOfWeek(new Date())
-  const weekDays = eachDayOfInterval({
-    start: startOfCurrentWeek,
-    end: addDays(startOfCurrentWeek, 6)
-  })
+  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   useEffect(() => {
     const workerTasks = tasks.filter(task => task.assignedTo === currentUser.id)
@@ -62,17 +59,54 @@ function WorkerAnalytics() {
     })
   }, [tasks, currentUser.id])
 
-  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+  const getDateRange = () => {
+    const now = new Date()
+    switch (dateRange) {
+      case 'day':
+        return {
+          start: new Date(now.setHours(0, 0, 0, 0)),
+          end: new Date(now.setHours(23, 59, 59, 999))
+        }
+      case 'week':
+        return {
+          start: startOfWeek(now),
+          end: endOfWeek(now)
+        }
+      case 'month':
+        return {
+          start: startOfMonth(now),
+          end: endOfMonth(now)
+        }
+      default:
+        return {
+          start: startOfWeek(now),
+          end: endOfWeek(now)
+        }
+    }
+  }
 
   const completionData = {
-    labels: weekDays.map(day => format(day, 'EEE')),
+    labels: dateRange === 'day' ? ['Today'] : weekDays,
     datasets: [{
       label: 'Tasks Completed',
-      data: weekDays.map(day => tasks.filter(task => {
-        if (task.assignedTo !== currentUser.id || task.status !== 'done' || !task.endTime) return false
-        const endDate = new Date(task.endTime)
-        return isValid(endDate) && format(endDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-      }).length),
+      data: dateRange === 'day' 
+        ? [
+            tasks.filter(task => {
+              if (task.assignedTo !== currentUser.id || task.status !== 'done' || !task.endTime) return false
+              const endDate = new Date(task.endTime)
+              return isValid(endDate) && isSameDay(endDate, new Date())
+            }).length
+          ]
+        : weekDays.map((_, index) => {
+            const { start, end } = getDateRange()
+            return tasks.filter(task => {
+              if (task.assignedTo !== currentUser.id || task.status !== 'done' || !task.endTime) return false
+              const endDate = new Date(task.endTime)
+              return isValid(endDate) && 
+                isWithinInterval(endDate, { start, end }) && 
+                endDate.getDay() === index
+            }).length
+          }),
       backgroundColor: isDark ? '#BFA5FF' : '#A5D8FF',
       borderColor: isDark ? '#7C3AED' : '#60A5FA',
       borderWidth: 2
@@ -99,14 +133,16 @@ function WorkerAnalytics() {
   }
 
   const timeData = {
-    labels: weekDays.map(day => format(day, 'EEE')),
+    labels: weekDays,
     datasets: [{
       label: 'Hours Worked',
-      data: weekDays.map(day => tasks.filter(task => {
-        if (task.assignedTo !== currentUser.id || !task.endTime) return false
-        const endDate = new Date(task.endTime)
-        return isValid(endDate) && format(endDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-      }).reduce((acc, task) => acc + ((task.timeSpent || 0) / (1000 * 60 * 60)), 0)),
+      data: weekDays.map((_, index) =>
+        tasks.filter(task => {
+          if (task.assignedTo !== currentUser.id || !task.endTime) return false
+          const endDate = new Date(task.endTime)
+          return isValid(endDate) && endDate.getDay() === index
+        }).reduce((acc, task) => acc + ((task.timeSpent || 0) / (1000 * 60 * 60)), 0)
+      ),
       fill: true,
       backgroundColor: isDark ? 'rgba(191,165,255,0.2)' : 'rgba(165,216,255,0.2)',
       borderColor: isDark ? '#BFA5FF' : '#60A5FA',
@@ -118,7 +154,11 @@ function WorkerAnalytics() {
     <div className="space-y-6 bg-neutral-light dark:bg-dark-600 text-gray-900 dark:text-white p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">My Performance</h1>
-        <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="form-input py-1 bg-white dark:bg-dark-400 dark:text-white">
+        <select 
+          value={dateRange} 
+          onChange={(e) => setDateRange(e.target.value)} 
+          className="form-input py-1 bg-white dark:bg-dark-400 dark:text-white"
+        >
           <option value="day">Today</option>
           <option value="week">This Week</option>
           <option value="month">This Month</option>
@@ -134,20 +174,84 @@ function WorkerAnalytics() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card bg-white dark:bg-dark-500 p-4 rounded-xl shadow-soft">
-          <h2 className="text-lg font-semibold mb-4">Task Completion</h2>
-          <Bar data={completionData} options={{ responsive: true, plugins: { legend: { position: 'top' }}}} />
+          <h2 className="text-lg font-semibold mb-4">
+            Task Completion - {dateRange === 'day' ? 'Today' : dateRange === 'week' ? 'This Week' : 'This Month'}
+          </h2>
+          <Bar 
+            data={completionData} 
+            options={{
+              responsive: true,
+              plugins: { 
+                legend: { position: 'top' },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      if (context.raw === 0) return 'No tasks completed'
+                      return `${context.raw} task${context.raw !== 1 ? 's' : ''} completed`
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: { precision: 0 }
+                }
+              }
+            }} 
+          />
         </div>
+
         <div className="card bg-white dark:bg-dark-500 p-4 rounded-xl shadow-soft">
           <h2 className="text-lg font-semibold mb-4">Task Distribution</h2>
           <div className="aspect-square">
-            <Doughnut data={distributionData} options={{ responsive: true, plugins: { legend: { position: 'top' }}}} />
+            <Doughnut 
+              data={distributionData} 
+              options={{ 
+                responsive: true, 
+                plugins: { 
+                  legend: { position: 'top' },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0)
+                        const value = context.raw
+                        const percentage = Math.round((value / total) * 100)
+                        return `${context.label}: ${value} (${percentage}%)`
+                      }
+                    }
+                  }
+                } 
+              }} 
+            />
           </div>
         </div>
       </div>
 
       <div className="card bg-white dark:bg-dark-500 p-4 rounded-xl shadow-soft">
         <h2 className="text-lg font-semibold mb-4">Time Tracking</h2>
-        <Line data={timeData} options={{ responsive: true, plugins: { legend: { position: 'top' }}, scales: { y: { beginAtZero: true, title: { display: true, text: 'Hours' }}} }} />
+        <Line 
+          data={timeData} 
+          options={{
+            responsive: true,
+            plugins: { 
+              legend: { position: 'top' },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.raw.toFixed(1)} hours`
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Hours' }
+              }
+            }
+          }} 
+        />
       </div>
     </div>
   )

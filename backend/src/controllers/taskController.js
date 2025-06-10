@@ -106,25 +106,37 @@ const updateTask = async (req, res, next) => {
     if (taskCheck.rows.length === 0) throw new ApiError(404, 'Task not found');
 
     const task = taskCheck.rows[0];
+
     if (userRole === 'worker' && task.assigned_to !== userId) {
       throw new ApiError(403, 'You can only update tasks assigned to you');
     }
 
+    // Определяем, нужно ли установить end_time
+    let endTimeUpdate = '';
+    const values = [title, description, status, assignedTo, priority, projectId, taskId];
+    if (status === 'done' && !task.end_time) {
+      endTimeUpdate = ', end_time = NOW()';
+    }
+
     const result = await db.query(
-      `UPDATE tasks
-       SET title = COALESCE($1, title),
-           description = COALESCE($2, description),
-           status = COALESCE($3, status),
-           assigned_to = COALESCE($4, assigned_to),
-           priority = COALESCE($5, priority),
-           project_id = COALESCE($6, project_id),
-           updated_at = NOW()
-       WHERE id = $7
-       RETURNING 
-         id, title, description, status, priority,
-         assigned_to as "assignedTo", created_by as "createdBy",
-         project_id as "projectId", created_at as "createdAt", updated_at as "updatedAt"`,
-      [title, description, status, assignedTo, priority, projectId, taskId]
+      `
+      UPDATE tasks
+      SET title = COALESCE($1, title),
+          description = COALESCE($2, description),
+          status = COALESCE($3, status),
+          assigned_to = COALESCE($4, assigned_to),
+          priority = COALESCE($5, priority),
+          project_id = COALESCE($6, project_id),
+          updated_at = NOW()
+          ${endTimeUpdate}
+      WHERE id = $7
+      RETURNING 
+        id, title, description, status, priority,
+        assigned_to as "assignedTo", created_by as "createdBy",
+        project_id as "projectId", created_at as "createdAt", updated_at as "updatedAt",
+        end_time as "endTime"
+      `,
+      values
     );
 
     logger.info(`Task updated: ${taskId}`);
@@ -133,6 +145,7 @@ const updateTask = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Удаление задачи
 const deleteTask = async (req, res, next) => {
@@ -152,9 +165,52 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
+// 📊 Получение статистики по завершённым задачам за неделю
+const getWeeklyTaskCompletion = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const { rows } = await db.query(`
+      SELECT
+        TO_CHAR(completed_at, 'Dy') AS day,
+        COUNT(*) AS count
+      FROM tasks
+      WHERE status = 'completed'
+        AND assigned_to = $1
+        AND completed_at >= NOW() - INTERVAL '7 days'
+      GROUP BY day
+      ORDER BY MIN(completed_at)
+    `, [userId]);
+
+    // Преобразуем в формат для графика
+    const daysMap = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6
+    };
+
+    const defaultData = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => ({
+      day,
+      completed: 0
+    }));
+
+    rows.forEach(({ day, count }) => {
+      const index = daysMap[day];
+      if (index !== undefined) {
+        defaultData[index].completed = parseInt(count, 10);
+      }
+    });
+
+    res.json(defaultData);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   deleteTask,
+  getWeeklyTaskCompletion,
 };
