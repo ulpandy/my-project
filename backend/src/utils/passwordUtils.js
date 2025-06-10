@@ -26,8 +26,29 @@ const comparePassword = async (password, hash) => {
   return await bcrypt.compare(password, hash);
 };
 
+// Generate a strong password that matches the validation regex
+const generateStrongPassword = () => {
+  const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  const specials = '!@#$%^&*';
+
+  const getRandom = (str) => str[Math.floor(Math.random() * str.length)];
+
+  let password = '';
+  password += getRandom(letters);
+  password += getRandom(letters);
+  password += getRandom(numbers);
+  password += getRandom(specials);
+  password += getRandom(letters);
+  password += getRandom(numbers);
+
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+};
+
+
 module.exports = {
   validatePassword,
   hashPassword,
   comparePassword,
+   generateStrongPassword,
 };

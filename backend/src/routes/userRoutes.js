@@ -1,5 +1,5 @@
 const express = require('express');
-const { getCurrentUser, updateCurrentUser, getAllUsers, updateAvatar, getUsersWithActivity, createUser } = require('../controllers/userController');
+const { getCurrentUser, updateCurrentUser, getAllUsers, updateAvatar, getUsersWithActivity, createUser, deleteUser } = require('../controllers/userController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { apiRateLimiter } = require('../middleware/rateLimiter');
 const multer = require('multer');
@@ -21,6 +21,7 @@ router.put('/me', updateCurrentUser);
 router.get('/', authorize('admin', 'manager'), getAllUsers);
 router.get('/with-activity', authenticate, authorize('admin', 'manager'), getUsersWithActivity);
 router.post('/', authorize('admin'), createUser);
+router.delete('/:id', authenticate, authorize('admin'), deleteUser)
 
 // Avatar upload route
 router.patch('/avatar', authenticate, upload.single('avatar'), updateAvatar);

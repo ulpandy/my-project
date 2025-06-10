@@ -7,7 +7,7 @@ function Users() {
   const [users, setUsers] = useState([])
   const [sortOrder, setSortOrder] = useState([])
   const [isAddingUser, setIsAddingUser] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'worker', password: '' })
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'worker', })
   const [emailError, setEmailError] = useState('')
 
   useEffect(() => {
@@ -30,29 +30,37 @@ function Users() {
   const validateEmail = (email) => /^\S+@\S+\.\S+$/.test(email)
 
   const handleAddUser = async () => {
-    if (!validateEmail(newUser.email)) {
-      setEmailError('Invalid email format')
-      return
-    }
+  if (!validateEmail(newUser.email)) {
+    setEmailError('Invalid email format');
+    return;
+  }
 
-    try {
-      const token = localStorage.getItem('token')
-      const res = await axios.post('http://localhost:3000/api/users', newUser, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setUsers(prev => [...prev, res.data])
-      setNewUser({ name: '', email: '', role: 'worker', password: '' })
-      setEmailError('')
-      setIsAddingUser(false)
-    } catch (err) {
-      console.error('Error adding user:', err)
-      if (err.response?.data?.message) {
-        setEmailError(err.response.data.message)
-      } else {
-        setEmailError('Failed to add user')
-      }
+  try {
+    const token = localStorage.getItem('token');
+
+    // Отправляем только нужные поля: name, email, role
+    const { name, email, role } = newUser;
+
+    const res = await axios.post('http://localhost:3000/api/users', {
+      name, email, role
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    setUsers(prev => [...prev, res.data]);
+    setNewUser({ name: '', email: '', role: 'worker' }); 
+    setEmailError('');
+    setIsAddingUser(false);
+  } catch (err) {
+    console.error('Error adding user:', err);
+    if (err.response?.data?.message) {
+      setEmailError(err.response.data.message);
+    } else {
+      setEmailError('Failed to add user');
     }
   }
+};
+
 
   const downloadUserPdf = async (userId) => {
     try {
@@ -69,6 +77,23 @@ function Users() {
       alert('Failed to download user activity PDF')
     }
   }
+
+  const handleDeleteUser = async (userId) => {
+  const confirmDelete = window.confirm('Are you sure you want to delete this user?')
+  if (!confirmDelete) return
+
+  try {
+    const token = localStorage.getItem('token')
+    await axios.delete(`http://localhost:3000/api/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    setUsers(prev => prev.filter(user => user.id !== userId))
+  } catch (err) {
+    console.error('Failed to delete user:', err)
+    alert('Failed to delete user')
+  }
+}
+
 
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return 'N/A'
@@ -142,13 +167,6 @@ function Users() {
             <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
-          <input
-            type="password"
-            placeholder="Password"
-            className="form-input w-full"
-            value={newUser.password}
-            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-          />
           <div className="flex justify-end space-x-2">
             <button className="btn-outline" onClick={() => {
               setIsAddingUser(false)
@@ -212,7 +230,7 @@ function Users() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button className="text-primary-600 hover:text-primary-900 mr-3"><FaEdit /></button>
-                  <button className="text-red-600 hover:text-red-900" onClick={() => setUsers(users.filter(u => u.id !== user.id))}><FaTrash /></button>
+                  <button className="text-red-600 hover:text-red-900" onClick={() => handleDeleteUser(user.id)}><FaTrash /></button>
                 </td>
               </tr>
             ))}
