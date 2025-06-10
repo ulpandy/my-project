@@ -122,7 +122,7 @@ function WorkerAnalytics() {
       try {
         const { start, end } = getDateRange()
         
-        const token = localStorage.getItem('token') // или sessionStorage / из context'а, если ты хранишь иначе
+        const token = localStorage.getItem('token') 
         if (!token) {
           console.error('Нет токена авторизации')
           return
@@ -150,22 +150,40 @@ function WorkerAnalytics() {
 
   useEffect(() => {
     const { start, end } = getDateRange()
+    const values = Array(7).fill(0)
+  
     console.log('Start of week:', start.toISOString())
     console.log('End of week:', end.toISOString())
   
     tasks.forEach(task => {
+      if (
+        task.assignedTo !== currentUser.id ||
+        task.status !== 'done' ||
+        !task.endTime ||
+        !task.timeSpent
+      ) return
+  
       const endDate = parseDate(task.endTime)
-      if (task.assignedTo === currentUser.id && task.status === 'done') {
+  
+      if (isValid(endDate) && isWithinInterval(endDate, { start, end })) {
+        const day = endDate.getDay()
+        const hours = task.timeSpent / 3600000
+  
         console.log({
           taskTitle: task.title,
           endTime: task.endTime,
-          parsed: isValid(endDate) ? endDate.toISOString() : 'Invalid Date',
-          inRange: isValid(endDate) && isWithinInterval(endDate, { start, end }),
-          day: isValid(endDate) ? endDate.getDay() : 'Invalid'
+          parsed: endDate.toISOString(),
+          addedHours: hours.toFixed(2),
+          dayOfWeek: day
         })
+  
+        values[day] += hours
       }
     })
+  
+    setTaskTimeStats(values)
   }, [tasks, dateRange, currentUser.id])
+  
   
 
   const completionData = useMemo(() => {
