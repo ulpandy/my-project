@@ -200,10 +200,105 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+const sendResetCode = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) throw new ApiError(400, 'Email is required');
+
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.status(200).json({ message: 'If the email exists, a code has been sent.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiration = new Date(Date.now() + 10 * 60 * 1000); // 10 минут
+
+    await db.query(`
+      UPDATE users
+      SET reset_code = $1,
+          reset_code_expires = $2
+      WHERE email = $3
+    `, [code, expiration, email]);
+
+    await sendEmail(
+      email,
+      '🔐 Your Password Reset Code',
+      `
+        <p>Here is your password reset code:</p>
+        <h2>${code}</h2>
+        <p>It will expire in 10 minutes.</p>
+      `
+    );
+
+    res.status(200).json({ message: 'If the email exists, a code has been sent.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const verifyResetCode = async (req, res, next) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) throw new ApiError(400, 'Email and code are required');
+
+    const result = await db.query(`
+      SELECT * FROM users
+      WHERE email = $1 AND reset_code = $2 AND reset_code_expires > NOW()
+    `, [email, code]);
+
+    if (result.rows.length === 0) {
+      throw new ApiError(400, 'Invalid or expired code');
+    }
+
+    res.status(200).json({ message: 'Code is valid' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+const resetPasswordWithCode = async (req, res, next) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      throw new ApiError(400, 'All fields are required');
+    }
+
+    const result = await db.query(`
+      SELECT * FROM users
+      WHERE email = $1 AND reset_code = $2 AND reset_code_expires > NOW()
+    `, [email, code]);
+
+    if (result.rows.length === 0) {
+      throw new ApiError(400, 'Invalid or expired code');
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await db.query(`
+      UPDATE users
+      SET password_hash = $1,
+          reset_code = NULL,
+          reset_code_expires = NULL
+      WHERE email = $2
+    `, [hashedPassword, email]);
+
+    res.status(200).json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 module.exports = {
   register,
   login,
   logout,
-  forgotPassword,
-  resetPassword
+  forgotPassword,        
+  resetPassword,         
+  sendResetCode,         
+  verifyResetCode,       
+  resetPasswordWithCode  
 };

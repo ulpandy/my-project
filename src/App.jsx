@@ -27,6 +27,8 @@ import Projects from './pages/Projects'
 import Users from './pages/Users'
 import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
+import VerifyCode from './pages/VerifyCode'
+import ResetPassword from './pages/ResetPassword'
 
 // Protected Route Component
 import ProtectedRoute from './components/ProtectedRoute'
@@ -60,6 +62,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-code" element={<VerifyCode />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Route>
 
         {/* Protected Routes */}
