@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import apiClient from '../utils/apiClient'
 
 const AI_SITES = ['chat.openai.com', 'bard.google.com', 'copilot.microsoft.com']
 
@@ -19,6 +19,7 @@ export function useActivityTracker() {
       window.addEventListener('click', handleClick)
       window.addEventListener('keydown', handleKeydown)
       window.addEventListener('mousemove', handleMouseMove)
+
       intervalRef.current = setInterval(() => {
         detectWindow()
         sendBufferedEvents()
@@ -44,24 +45,23 @@ export function useActivityTracker() {
 
   function detectWindow() {
     try {
-      if (!document.hasFocus()) return;
-  
-      const activeUrl = window.location.href;
-      const domain = new URL(activeUrl).hostname;
-  
+      if (!document.hasFocus()) return
+
+      const activeUrl = window.location.href
+      const domain = new URL(activeUrl).hostname
+
       if (domain && domain !== lastWindow.current) {
-        lastWindow.current = domain;
-  
+        lastWindow.current = domain
+
         bufferEvent('window_switch', {
           title: document.title || 'Untitled',
           url: activeUrl
-        });
+        })
       }
     } catch (e) {
-      console.warn('Window switch detection error:', e);
+      console.warn('Window switch detection error:', e)
     }
   }
-  
 
   async function sendBufferedEvents() {
     const token = localStorage.getItem('token')
@@ -91,14 +91,12 @@ export function useActivityTracker() {
         }
 
         try {
-          await axios.post('http://localhost:3000/api/activity', {
+          await apiClient.post('/activity', {
             type: 'window-switch',
             timestamp: event.timestamp,
             title: event.title,
             url: event.url,
             isAiTool
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
           })
         } catch (err) {
           console.error('Failed to log window switch:', err)
@@ -108,14 +106,12 @@ export function useActivityTracker() {
 
     if (grouped.mouseClicks || grouped.keyPresses || grouped.mouseMovements) {
       try {
-        await axios.post('http://localhost:3000/api/activity', {
+        await apiClient.post('/activity', {
           type: 'user-activity',
           timestamp: new Date().toISOString(),
           mouseClicks: grouped.mouseClicks,
           keyPresses: grouped.keyPresses,
           mouseMovements: grouped.mouseMovements
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         })
       } catch (err) {
         console.error('Failed to log user activity:', err)

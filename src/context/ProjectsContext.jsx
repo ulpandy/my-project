@@ -1,11 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import axios from 'axios'
+import apiClient from '../utils/apiClient'
 import { useAuth } from './AuthContext'
 
-// Configure axios once (consider moving this to a separate api/client.js file)
-const apiClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
-})
+
 
 export const ProjectsContext = createContext()
 

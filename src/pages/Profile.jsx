@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   FaEnvelope, FaUser, FaLock, FaSave, FaEye, FaEyeSlash
 } from 'react-icons/fa'
-import axios from 'axios'
+import apiClient from '../utils/apiClient'
 
 // 🔧 Генерация аватарки с инициалами
 function generateAvatarWithInitials(name = 'U') {
@@ -83,11 +83,9 @@ function Profile() {
       uploadData.append('avatar', formData.avatarFile)
 
       try {
-        const token = localStorage.getItem('token')
-        const res = await axios.patch('/users/avatar', uploadData, {
+        const res = await apiClient.patch('/users/avatar', uploadData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`
+            'Content-Type': 'multipart/form-data'
           }
         })
         avatarUrl = res.data.avatar

@@ -80,6 +80,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+
+
 // Статические файлы (например, аватарки)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

@@ -1,25 +1,20 @@
 import { useState, useEffect } from 'react'
 import { FaUserPlus, FaEdit, FaTrash, FaCheck, FaTimes, FaFilePdf } from 'react-icons/fa'
-import axios from 'axios'
+import apiClient from '../utils/apiClient'
 import { saveAs } from 'file-saver'
 
 function Users() {
   const [users, setUsers] = useState([])
   const [sortOrder, setSortOrder] = useState([])
   const [isAddingUser, setIsAddingUser] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'worker', })
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'worker' })
   const [emailError, setEmailError] = useState('')
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch('http://localhost:3000/api/users/with-activity', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!res.ok) throw new Error('Failed to fetch users')
-        const data = await res.json()
-        setUsers(data)
+        const res = await apiClient.get('/users/with-activity')
+        setUsers(res.data)
       } catch (err) {
         console.error('Error loading users:', err)
       }
@@ -30,77 +25,54 @@ function Users() {
   const validateEmail = (email) => /^\S+@\S+\.\S+$/.test(email)
 
   const handleAddUser = async () => {
-  if (!validateEmail(newUser.email)) {
-    setEmailError('Invalid email format');
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem('token');
-
-    // Отправляем только нужные поля: name, email, role
-    const { name, email, role } = newUser;
-
-    const res = await axios.post('http://localhost:3000/api/users', {
-      name, email, role
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    setUsers(prev => [...prev, res.data]);
-    setNewUser({ name: '', email: '', role: 'worker' }); 
-    setEmailError('');
-    setIsAddingUser(false);
-  } catch (err) {
-    console.error('Error adding user:', err);
-    if (err.response?.data?.message) {
-      setEmailError(err.response.data.message);
-    } else {
-      setEmailError('Failed to add user');
-    }
-  }
-};
-
-
-const downloadUserPdf = async () => {
-  try {
-    const token = localStorage.getItem('token')
-
-    if (!token) {
-      alert('Authorization token not found')
+    if (!validateEmail(newUser.email)) {
+      setEmailError('Invalid email format')
       return
     }
 
-    // Диапазон: последние 7 дней
-    const now = new Date()
-    const endDateObj = new Date(now)
-    const startDateObj = new Date(now)
-    startDateObj.setDate(endDateObj.getDate() - 7)
+    try {
+      const { name, email, role } = newUser
+      const res = await apiClient.post('/users', { name, email, role })
 
-    // Добавим +1 день к endDate, чтобы включить события до конца дня
-    endDateObj.setDate(endDateObj.getDate() + 1)
-
-    const formatDate = (date) => date.toISOString().split('T')[0]
-
-    const response = await axios.get('http://localhost:3000/api/activity/pdf', {
-      params: {
-        startDate: formatDate(startDateObj),
-        endDate: formatDate(endDateObj)
-      },
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      responseType: 'blob'
-    })
-
-    const pdfBlob = new Blob([response.data], { type: 'application/pdf' })
-    saveAs(pdfBlob, 'activity-report.pdf')
-  } catch (error) {
-    console.error('Failed to download PDF:', error)
-    alert('PDF download failed')
+      setUsers(prev => [...prev, res.data])
+      setNewUser({ name: '', email: '', role: 'worker' })
+      setEmailError('')
+      setIsAddingUser(false)
+    } catch (err) {
+      console.error('Error adding user:', err)
+      if (err.response?.data?.message) {
+        setEmailError(err.response.data.message)
+      } else {
+        setEmailError('Failed to add user')
+      }
+    }
   }
-}
 
+  const downloadUserPdf = async () => {
+    try {
+      const now = new Date()
+      const endDateObj = new Date(now)
+      const startDateObj = new Date(now)
+      startDateObj.setDate(endDateObj.getDate() - 7)
+      endDateObj.setDate(endDateObj.getDate() + 1)
+
+      const formatDate = (date) => date.toISOString().split('T')[0]
+
+      const response = await apiClient.get('/activity/pdf', {
+        params: {
+          startDate: formatDate(startDateObj),
+          endDate: formatDate(endDateObj)
+        },
+        responseType: 'blob'
+      })
+
+      const pdfBlob = new Blob([response.data], { type: 'application/pdf' })
+      saveAs(pdfBlob, 'activity-report.pdf')
+    } catch (error) {
+      console.error('Failed to download PDF:', error)
+      alert('PDF download failed')
+    }
+  }
 
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return 'N/A'
@@ -138,6 +110,11 @@ const downloadUserPdf = async () => {
 
   const sortedUsers = multiSort(users, sortOrder)
   const isActiveSort = (key) => sortOrder.includes(key)
+
+  const handleDeleteUser = (id) => {
+    // Напиши реализацию удаления при необходимости
+    console.log('Delete user', id)
+  }
 
   return (
     <div className="space-y-6">
@@ -231,7 +208,7 @@ const downloadUserPdf = async () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-500">
-                  <button onClick={() => downloadUserPdf(user.id)} className="hover:underline flex items-center">
+                  <button onClick={downloadUserPdf} className="hover:underline flex items-center">
                     <FaFilePdf className="mr-1" /> PDF
                   </button>
                 </td>

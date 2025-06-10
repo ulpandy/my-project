@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-import axios from 'axios';
-
-axios.defaults.baseURL = 'http://localhost:3000/api';
+import apiClient from '../utils/apiClient';
 
 const TasksContext = createContext();
 
@@ -14,13 +12,10 @@ export function TasksProvider({ children }) {
   const { currentUser, token } = useAuth();
   const [tasks, setTasks] = useState([]);
 
-  // 🔄 Загрузка задач
   const fetchTasks = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await axios.get('/tasks', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiClient.get('/tasks');
       setTasks(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error loading tasks:', err);
@@ -32,7 +27,6 @@ export function TasksProvider({ children }) {
     fetchTasks();
   }, [fetchTasks]);
 
-  // 📤 Фильтрация задач
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
 
@@ -51,7 +45,6 @@ export function TasksProvider({ children }) {
     return validTasks.filter(t => t.assignedTo === currentUser.id);
   }, [currentUser, tasks]);
 
-  // 🧠 Группировка по статусам
   const getTasksByStatus = useCallback(() => {
     return {
       todo: filteredTasks.filter(t => t.status === 'todo'),
@@ -61,10 +54,8 @@ export function TasksProvider({ children }) {
     };
   }, [filteredTasks]);
 
-  // 🔍 Получение отфильтрованных задач
   const getFilteredTasks = useCallback(() => filteredTasks, [filteredTasks]);
 
-  // ➕ Создание задачи
   const createTask = async (taskData) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -73,12 +64,10 @@ export function TasksProvider({ children }) {
     }
 
     try {
-      const res = await axios.post('/tasks', {
+      const res = await apiClient.post('/tasks', {
         ...taskData,
         status: 'todo',
         createdBy: currentUser.id
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       const created = res.data;
@@ -93,7 +82,6 @@ export function TasksProvider({ children }) {
     }
   };
 
-  // ✏️ Обновление задачи
   const updateTask = async (id, updates) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -110,10 +98,7 @@ export function TasksProvider({ children }) {
     }
 
     try {
-      const res = await axios.put(`/tasks/${id}`, updates, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
+      const res = await apiClient.put(`/tasks/${id}`, updates);
       const updated = res.data;
       setTasks(prev => prev.map(t => (t.id === updated.id ? updated : t)));
       return { success: true, task: updated };
@@ -125,7 +110,6 @@ export function TasksProvider({ children }) {
     }
   };
 
-  // ❌ Удаление задачи
   const deleteTask = async (id) => {
     if (!currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -134,10 +118,7 @@ export function TasksProvider({ children }) {
     }
 
     try {
-      await axios.delete(`/tasks/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
+      await apiClient.delete(`/tasks/${id}`);
       setTasks(prev => prev.filter(t => t.id !== id));
       return { success: true };
     } catch (err) {
@@ -149,7 +130,6 @@ export function TasksProvider({ children }) {
     }
   };
 
-  // 🌐 Контекстные значения
   const value = {
     tasks,
     filteredTasks,

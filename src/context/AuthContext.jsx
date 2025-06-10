@@ -1,10 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import Cookies from 'js-cookie';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 
-axios.defaults.baseURL = 'http://localhost:3000/api';
-
-const AuthContext = createContext()
+const AuthContext = createContext();
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -40,63 +38,63 @@ export function AuthProvider({ children }) {
 
   // Login
   const login = async (email, password) => {
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
 
-  try {
-    const res = await axios.post('/auth/login', { email, password });
-    const { token, id, email: userEmail, name, role } = res.data;
+    try {
+      const res = await apiClient.post('/auth/login', { email, password });
+      const { token, id, email: userEmail, name, role } = res.data;
 
-    const user = { id, email: userEmail, name, role };
+      const user = { id, email: userEmail, name, role };
 
-    setCurrentUser(user);
-    setToken(token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    Cookies.set('authToken', token, { expires: 7 });
+      setCurrentUser(user);
+      setToken(token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      Cookies.set('authToken', token, { expires: 7 });
 
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // 👈 добавлено
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-    return { success: true };
-  } catch (err) {
-    setError(err.response?.data?.message || 'Login failed');
-    return { success: false, error: err.response?.data?.message || 'Login failed' };
-  } finally {
-    setLoading(false);
-  }
-};
+      return { success: true };
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed');
+      return { success: false, error: err.response?.data?.message || 'Login failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const register = async (email, password, name, role = 'worker') => {
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
 
-  try {
-    const res = await axios.post('/auth/register', {
-      email,
-      password,
-      name,
-      role
-    });
+    try {
+      const res = await apiClient.post('/auth/register', {
+        email,
+        password,
+        name,
+        role
+      });
 
-    const { token, id, email: userEmail, name: userName, role: userRole } = res.data;
-    const user = { id, email: userEmail, name: userName, role: userRole };
+      const { token, id, email: userEmail, name: userName, role: userRole } = res.data;
+      const user = { id, email: userEmail, name: userName, role: userRole };
 
-    setCurrentUser(user);
-    setToken(token);
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    Cookies.set('authToken', token, { expires: 7 });
+      setCurrentUser(user);
+      setToken(token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      Cookies.set('authToken', token, { expires: 7 });
 
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; // 👈 добавлено
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-    return { success: true };
-  } catch (err) {
-    setError(err.response?.data?.message || 'Registration failed');
-    return { success: false, error: err.response?.data?.message || 'Registration failed' };
-  } finally {
-    setLoading(false);
-  }
-};
+      return { success: true };
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed');
+      return { success: false, error: err.response?.data?.message || 'Registration failed' };
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Logout
   const logout = () => {

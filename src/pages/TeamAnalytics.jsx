@@ -12,7 +12,7 @@ import {
 import { Bar } from 'react-chartjs-2'
 import { FaUsers, FaTasks, FaCheckCircle, FaClock, FaFilePdf } from 'react-icons/fa'
 import { useTasks } from '../context/TasksContext'
-import axios from 'axios'
+import apiClient from '../utils/apiClient'
 import { saveAs } from 'file-saver'
 import { intervalToDuration, formatDuration } from 'date-fns'
 
@@ -33,12 +33,6 @@ function TeamAnalytics() {
 
   const downloadPdf = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        alert('Authorization token not found')
-        return
-      }
-
       const now = new Date()
       const startDate = new Date(now)
       const endDate = new Date(now)
@@ -47,13 +41,10 @@ function TeamAnalytics() {
 
       const formatDate = (date) => date.toISOString().split('T')[0]
 
-      const response = await axios.get('http://localhost:3000/api/activity/pdf', {
+      const response = await apiClient.get('/activity/pdf', {
         params: {
           startDate: formatDate(startDate),
           endDate: formatDate(endDate)
-        },
-        headers: {
-          Authorization: `Bearer ${token}`
         },
         responseType: 'blob'
       })
@@ -69,13 +60,8 @@ function TeamAnalytics() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch('http://localhost:3000/api/users/with-activity', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
-        if (!res.ok) throw new Error('Failed to fetch users')
-        const users = await res.json()
+        const res = await apiClient.get('/users/with-activity')
+        const users = res.data
 
         const active = users.filter(u => u.tasks && u.tasks.length > 0).length
 
