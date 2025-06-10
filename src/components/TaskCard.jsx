@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useDrag } from 'react-dnd'
 import {
   FaTrash, FaEdit, FaExclamationCircle, FaRegCheckCircle,
-  FaClock, FaPlay, FaStop
+  FaClock, FaPlay, FaStop, FaPause
 } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { useTasks } from '../context/TasksContext'
@@ -16,23 +16,28 @@ function TaskCard({ task }) {
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description)
-  const [elapsedTime, setElapsedTime] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(task.timeSpent || 0)
+  const [isPaused, setIsPaused] = useState(false)
+  const [pauseStartTime, setPauseStartTime] = useState(null)
+  const [totalPausedTime, setTotalPausedTime] = useState(0)
 
   useEffect(() => {
     let interval
-    if (task.status === 'inprogress' && task.startTime) {
+    if (task.status === 'inprogress' && task.startTime && !isPaused) {
       interval = setInterval(() => {
-        const elapsed = Date.now() - new Date(task.startTime).getTime()
+        const baseTime = new Date(task.startTime).getTime()
+        const now = Date.now()
+        const elapsed = now - baseTime - totalPausedTime
         setElapsedTime(elapsed)
       }, 1000)
     }
     return () => clearInterval(interval)
-  }, [task.status, task.startTime])
+  }, [task.status, task.startTime, isPaused, totalPausedTime])
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'task',
     item: { id: task.id },
-    canDrag: () => currentUser.role !== 'worker' || task.assignedTo === currentUser.id,
+    canDrag: true,
     collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
   }))
 
@@ -47,17 +52,30 @@ function TaskCard({ task }) {
 
   const handleStartTask = () => {
     updateTask(task.id, {
-      startTime: new Date().toISOString(),
-      status: 'inprogress'
+      status: 'inprogress' // ⛔ Без startTime — backend сам ставит NOW()
     })
   }
 
+  const handlePauseTask = () => {
+    if (!isPaused) {
+      setPauseStartTime(Date.now())
+    } else {
+      const pauseEndTime = Date.now()
+      const pauseDuration = pauseEndTime - pauseStartTime
+      setTotalPausedTime(prev => prev + pauseDuration)
+      setPauseStartTime(null)
+    }
+    setIsPaused(!isPaused)
+  }
+
   const handleStopTask = () => {
+    const finalElapsedTime = elapsedTime
     updateTask(task.id, {
-      endTime: new Date().toISOString(),
       status: 'done',
-      timeSpent: elapsedTime
+      timeSpent: finalElapsedTime // ⏱️ отправляем только длительность
     })
+    setIsPaused(false)
+    setTotalPausedTime(0)
   }
 
   const formatTime = (ms) => {
@@ -82,7 +100,9 @@ function TaskCard({ task }) {
   const getStatusIcon = () => {
     switch (task.status) {
       case 'inprogress':
-        return <FaExclamationCircle className="text-yellow-500" title="In Progress" />
+        return isPaused 
+          ? <span className="text-gray-400" title="Paused">⏸</span>
+          : <FaExclamationCircle className="text-yellow-500" title="In Progress" />
       case 'done':
         return <FaRegCheckCircle className="text-green-500" title="Completed" />
       case 'frozen':
@@ -146,24 +166,60 @@ function TaskCard({ task }) {
             </p>
           )}
 
-          {task.status === 'inprogress' && task.startTime && (
-            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
-              <FaClock className="mr-1" />
-              Time spent: {formatTime(elapsedTime)}
+          {task.startTime && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <strong>Start:</strong> {new Date(task.startTime).toLocaleString()}
             </div>
           )}
 
-          {task.status === 'todo' && (
-            <button onClick={handleStartTask} className="text-primary-600 dark:text-primary-400 hover:underline text-sm mb-2 flex items-center">
-              <FaPlay className="mr-1" /> Start
-            </button>
+          {task.endTime && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              <strong>End:</strong> {new Date(task.endTime).toLocaleString()}
+            </div>
           )}
 
-          {task.status === 'inprogress' && (
-            <button onClick={handleStopTask} className="text-red-600 dark:text-red-400 hover:underline text-sm mb-2 flex items-center">
-              <FaStop className="mr-1" /> Complete
-            </button>
+          {(task.status === 'inprogress' && task.startTime) && (
+            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+              <FaClock className="mr-1" />
+              Time spent: {formatTime(elapsedTime)}
+              {isPaused && <span className="ml-1 text-gray-400">(paused)</span>}
+            </div>
           )}
+
+          {(task.status === 'done' && task.timeSpent > 0) && (
+            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+              <FaClock className="mr-1" />
+              <span className="font-medium">Time spent:</span>&nbsp;{formatTime(task.timeSpent)}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {task.status === 'todo' && (
+              <button 
+                onClick={handleStartTask} 
+                className="text-primary-600 dark:text-primary-400 hover:underline text-sm mb-2 flex items-center"
+              >
+                <FaPlay className="mr-1" /> Start
+              </button>
+            )}
+
+            {task.status === 'inprogress' && (
+              <>
+                <button 
+                  onClick={handlePauseTask} 
+                  className="text-yellow-600 dark:text-yellow-400 hover:underline text-sm mb-2 flex items-center"
+                >
+                  <FaPause className="mr-1" /> {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button 
+                  onClick={handleStopTask} 
+                  className="text-red-600 dark:text-red-400 hover:underline text-sm mb-2 flex items-center"
+                >
+                  <FaStop className="mr-1" /> Complete
+                </button>
+              </>
+            )}
+          </div>
 
           {(currentUser.role === 'admin' || currentUser.role === 'manager') && (
             <div className="flex justify-end gap-3 text-gray-500 dark:text-gray-400 mt-2">

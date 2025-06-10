@@ -8,24 +8,19 @@ function TaskColumn({ status, title, tasks }) {
   const { currentUser } = useAuth()
 
   // Set up drop target
-  const [{ isOver }, drop] = useDrop(() => ({
+   const [{ isOver }, drop] = useDrop(() => ({
     accept: 'task',
     drop: (item) => {
-      handleDrop(item.id)
-    },
-    canDrop: (item) => {
-      // Workers can only move their own tasks
-      if (currentUser.role === 'worker') {
-        const task = tasks.find(t => t.id === item.id)
-        return task && task.assignedTo === currentUser.id
-      }
-      return true
-    },
+     handleDrop(item.id)
+   },
+  // Удалена проверка assignedTo
+    canDrop: () => true,
     collect: (monitor) => ({
-      isOver: !!monitor.isOver(),
-      canDrop: !!monitor.canDrop(),
-    }),
-  }))
+     isOver: !!monitor.isOver(),
+     canDrop: !!monitor.canDrop(),
+  }),
+}))
+
 
   const handleDrop = (taskId) => {
     updateTask(taskId, { status })

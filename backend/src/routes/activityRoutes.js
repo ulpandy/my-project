@@ -1,19 +1,33 @@
 const express = require('express');
-const { logActivity, getActivityStats , downloadActivityPdf , getPerUserActivityStats } = require('../controllers/activityController');
+const {
+  logActivity,
+  getActivityStats,
+  downloadActivityPdf,
+  getPerUserActivityStats,
+  getWorkedHoursPerWeek // ✅ Новый контроллер
+} = require('../controllers/activityController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { apiRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
-// Apply authentication to all activity routes
+// 🔐 Применяем middleware для всех маршрутов активности
 router.use(authenticate);
-// Apply rate limiting to all activity routes
 router.use(apiRateLimiter);
 
-// Activity routes
+// 📌 POST: логирование пользовательской активности
 router.post('/', logActivity);
+
+// 📊 GET: статистика активности по кликам / клавишам и т.д.
 router.get('/stats', authorize('admin', 'manager'), getActivityStats);
+
+// 🧾 GET: PDF отчёт о событиях активности
 router.get('/pdf', authorize('admin', 'manager'), downloadActivityPdf);
-router.get('/per-user-stats', authenticate, getPerUserActivityStats)
+
+// 👥 GET: метрики активности по каждому пользователю
+router.get('/per-user-stats', authorize('admin', 'manager'), getPerUserActivityStats);
+
+// ⏱️ ✅ GET: отработанные часы по дням недели (для графика Time Tracking)
+router.get('/worked-hours', getWorkedHoursPerWeek);
 
 module.exports = router;

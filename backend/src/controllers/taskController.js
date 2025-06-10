@@ -16,6 +16,7 @@ const getTasks = async (req, res, next) => {
         t.assigned_to as "assignedTo", t.created_by as "createdBy",
         t.project_id as "projectId",
         t.created_at as "createdAt", t.updated_at as "updatedAt",
+        t.end_time as "endTime", t.time_spent as "timeSpent", -- ✅ добавлено
         u1.name as "assignedToName", u2.name as "createdByName",
         p.name as "projectName"
       FROM tasks t
@@ -69,10 +70,7 @@ const createTask = async (req, res, next) => {
 
     if (!title) throw new ApiError(400, 'Title is required');
     if (!createdBy || !isUUID(createdBy)) throw new ApiError(400, 'Valid createdBy is required');
-
-    if (assignedTo && (!isUUID(assignedTo))) {
-      throw new ApiError(400, 'assignedTo must be a valid UUID if provided');
-    }
+    if (assignedTo && !isUUID(assignedTo)) throw new ApiError(400, 'assignedTo must be a valid UUID');
 
     const result = await db.query(
       `INSERT INTO tasks (title, description, assigned_to, priority, created_by, project_id)
@@ -91,11 +89,20 @@ const createTask = async (req, res, next) => {
   }
 };
 
-// Обновление задачи
 const updateTask = async (req, res, next) => {
   try {
     const taskId = req.params.id;
-    const { title, description, status, assignedTo, priority, projectId } = req.body;
+    const {
+      title,
+      description,
+      status,
+      assignedTo,
+      priority,
+      projectId,
+      timeSpent,
+      startTime // 🆕 разрешаем клиенту явно передать
+    } = req.body;
+
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -111,33 +118,76 @@ const updateTask = async (req, res, next) => {
       throw new ApiError(403, 'You can only update tasks assigned to you');
     }
 
-    // Определяем, нужно ли установить end_time
-    let endTimeUpdate = '';
-    const values = [title, description, status, assignedTo, priority, projectId, taskId];
-    if (status === 'done' && !task.end_time) {
-      endTimeUpdate = ', end_time = NOW()';
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    // 🟦 Добавляем поля
+    if (title !== undefined) {
+      updates.push(`title = COALESCE($${paramIndex++}, title)`);
+      values.push(title);
     }
 
-    const result = await db.query(
-      `
+    if (description !== undefined) {
+      updates.push(`description = COALESCE($${paramIndex++}, description)`);
+      values.push(description);
+    }
+
+    if (status !== undefined) {
+      updates.push(`status = COALESCE($${paramIndex++}, status)`);
+      values.push(status);
+    }
+
+    if (assignedTo !== undefined) {
+      updates.push(`assigned_to = COALESCE($${paramIndex++}, assigned_to)`);
+      values.push(assignedTo);
+    }
+
+    if (priority !== undefined) {
+      updates.push(`priority = COALESCE($${paramIndex++}, priority)`);
+      values.push(priority);
+    }
+
+    if (projectId !== undefined) {
+      updates.push(`project_id = COALESCE($${paramIndex++}, project_id)`);
+      values.push(projectId);
+    }
+
+    // 🟨 Установка start_time при первом переходе в inprogress
+    if (status === 'inprogress' && !task.start_time) {
+      updates.push(`start_time = NOW()`);
+    }
+
+    // 🟥 Установка end_time и time_spent, если задача завершается
+    if (status === 'done' && !task.end_time) {
+      updates.push(`end_time = NOW()`);
+
+      if (timeSpent) {
+        updates.push(`time_spent = $${paramIndex++}`);
+        values.push(timeSpent);
+      } else if (task.start_time) {
+        updates.push(`time_spent = EXTRACT(EPOCH FROM (NOW() - start_time)) * 1000`);
+      }
+    }
+
+    // 🟦 Обновляем updated_at
+    updates.push(`updated_at = NOW()`);
+
+    // Собираем итоговый запрос
+    const query = `
       UPDATE tasks
-      SET title = COALESCE($1, title),
-          description = COALESCE($2, description),
-          status = COALESCE($3, status),
-          assigned_to = COALESCE($4, assigned_to),
-          priority = COALESCE($5, priority),
-          project_id = COALESCE($6, project_id),
-          updated_at = NOW()
-          ${endTimeUpdate}
-      WHERE id = $7
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
       RETURNING 
         id, title, description, status, priority,
         assigned_to as "assignedTo", created_by as "createdBy",
         project_id as "projectId", created_at as "createdAt", updated_at as "updatedAt",
-        end_time as "endTime"
-      `,
-      values
-    );
+        start_time as "startTime", end_time as "endTime", time_spent as "timeSpent"
+    `;
+
+    values.push(taskId); // последний параметр — ID задачи
+
+    const result = await db.query(query, values);
 
     logger.info(`Task updated: ${taskId}`);
     res.status(200).json(result.rows[0]);
@@ -145,6 +195,9 @@ const updateTask = async (req, res, next) => {
     next(error);
   }
 };
+
+
+
 
 
 // Удаление задачи
@@ -165,24 +218,23 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
-// 📊 Получение статистики по завершённым задачам за неделю
+// 📊 Завершённые задачи по дням недели
 const getWeeklyTaskCompletion = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
     const { rows } = await db.query(`
       SELECT
-        TO_CHAR(completed_at, 'Dy') AS day,
+        TO_CHAR(end_time, 'Dy') AS day,
         COUNT(*) AS count
       FROM tasks
-      WHERE status = 'completed'
+      WHERE status = 'done'
         AND assigned_to = $1
-        AND completed_at >= NOW() - INTERVAL '7 days'
+        AND end_time >= NOW() - INTERVAL '7 days'
       GROUP BY day
-      ORDER BY MIN(completed_at)
+      ORDER BY MIN(end_time)
     `, [userId]);
 
-    // Преобразуем в формат для графика
     const daysMap = {
       Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6
     };
@@ -205,12 +257,10 @@ const getWeeklyTaskCompletion = async (req, res, next) => {
   }
 };
 
-
-
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   deleteTask,
-  getWeeklyTaskCompletion,
+  getWeeklyTaskCompletion
 };
